@@ -1,5 +1,5 @@
 [package]
-name = "ruslychat"
+name = "ruslychat-client"
 version = "0.1.0"
 edition = "2021"
 
