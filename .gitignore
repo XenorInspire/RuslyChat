@@ -2,3 +2,4 @@
 *.env
 ruslychat-client/target
 ruslychat-server/target
+ruslychat-server/Cargo.lock
