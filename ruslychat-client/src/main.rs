@@ -1,3 +1,7 @@
+mod init;
+
 fn main() {
-    println!("Hello, world!");
+
+    init::display();
+    
 }

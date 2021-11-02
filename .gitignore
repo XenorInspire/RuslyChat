@@ -2,3 +2,13 @@
 *.env
 ruslychat-client/target
 ruslychat-server/target
+ruslychat-client/output/debug/ruslychat-client.d
+ruslychat-client/output/debug/.fingerprint
+ruslychat-client/output/debug/build
+ruslychat-client/output/debug/examples
+ruslychat-client/output/debug/deps
+ruslychat-client/output/debug/incremental
+ruslychat-client/output/debug/.cargo-lock
+ruslychat-client/output/CACHEDIR.TAG
+ruslychat-client/output/.rustc_info.json
+ruslychat-client/output/debug/ruslychat-client
