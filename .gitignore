@@ -12,3 +12,5 @@ ruslychat-client/output/debug/.cargo-lock
 ruslychat-client/output/CACHEDIR.TAG
 ruslychat-client/output/.rustc_info.json
 ruslychat-client/output/debug/ruslychat-client
+ruslychat-client/output/rls/
+ruslychat-client/Cargo.lock
