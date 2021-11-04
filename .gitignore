@@ -14,3 +14,7 @@ ruslychat-client/output/.rustc_info.json
 ruslychat-client/output/debug/ruslychat-client
 ruslychat-client/output/rls/
 ruslychat-client/Cargo.lock
+
+ruslychat-server/output/
+
+ruslychat-server/Cargo.lock
