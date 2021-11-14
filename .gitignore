@@ -22,4 +22,4 @@ ruslychat-server/Cargo.lock
 ruslychat-client/logs/
 ruslychat-server/logs/
 
-config/*
+config/
