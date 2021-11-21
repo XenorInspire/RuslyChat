@@ -1,9 +1,13 @@
 extern crate mysql;
+extern crate chrono;
 
 mod init;
+mod log;
 
 use mysql::prelude::*;
 use mysql::*;
+use log::LogLevel;
+use log::Logger;
 
 struct User {
     email: String,
@@ -33,5 +37,19 @@ fn main() -> Result<()> {
                     })
     )?;
 
+    println!("{}", config.port);
+    println!("{}", config.logs_directory);
+    println!("{}", config.database);
+    println!("{}", config.user);
+    println!("{}", config.passwd);
+
+    let mut logger = Logger {
+        path: config.logs_directory,
+        log_file: "".to_string(),
+        max_size: 10
+    };
+
+    logger.log("coucou".to_string(), LogLevel::INFO);
+    
     Ok(())
 }
