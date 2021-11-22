@@ -37,12 +37,6 @@ fn main() -> Result<()> {
                     })
     )?;
 
-    println!("{}", config.port);
-    println!("{}", config.logs_directory);
-    println!("{}", config.database);
-    println!("{}", config.user);
-    println!("{}", config.passwd);
-
     let mut logger = Logger {
         path: config.logs_directory,
         log_file: "".to_string(),
