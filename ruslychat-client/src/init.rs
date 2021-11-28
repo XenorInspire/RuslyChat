@@ -7,24 +7,37 @@ use std::path::Path;
 use std::process;
 use std::{thread, time};
 
-static CONFIG_FILE: &str = "config/config.ini";
+const CONFIG_FILE: &str = "config/config.ini";
+const NEW_CONFIG_FILE_MODE: u8 = 0;
+pub const CURRENT_CONFIG_FILE_MODE: u8 = 1;
 
+#[derive(PartialEq)]
 pub struct Config {
     pub domain: String,
     pub port_dest: u16,
     pub logs_directory: String,
 }
 
+impl Clone for Config {
+    fn clone(&self) -> Self {
+        Config {
+            domain: self.domain.clone(),
+            port_dest: self.port_dest.clone(),
+            logs_directory: self.logs_directory.clone(),
+        }
+    }
+}
+
 pub fn check_init_file() -> Config {
     if Path::new(CONFIG_FILE).exists() == true {
         return parse_init_file();
     } else {
-        create_new_config_file();
         let config = Config {
             domain: "127.0.0.1".to_string(),
             port_dest: 6969,
             logs_directory: "logs".to_string(),
         };
+        create_new_config_file(NEW_CONFIG_FILE_MODE, config.clone());
         return config;
     }
 }
@@ -47,26 +60,28 @@ fn parse_init_file() -> Config {
     return config;
 }
 
-fn create_new_config_file() {
-    if Path::new("config").exists() == false {
-        let f = fs::create_dir_all("config");
-        match f {
-            Err(e) => {
-                println!("Error, the config file can't be created\n{}", e);
-                let duration = time::Duration::from_secs(2);
-                thread::sleep(duration);
-                process::exit(0);
+pub fn create_new_config_file(mode: u8, config: Config) {
+    if mode == NEW_CONFIG_FILE_MODE {
+        if Path::new("config").exists() == false {
+            let f = fs::create_dir_all("config");
+            match f {
+                Err(e) => {
+                    println!("Error, the config file can't be created\n{}", e);
+                    let duration = time::Duration::from_secs(2);
+                    thread::sleep(duration);
+                    process::exit(0);
+                }
+                _ => (),
             }
-            _ => (),
         }
     }
 
     let mut conf = Ini::new();
     conf.with_section(Some("NETWORK SETTINGS"))
-        .set("domain", "127.0.0.1")
-        .set("portDest", "6969");
+        .set("domain", config.domain)
+        .set("portDest", config.port_dest.to_string());
     conf.with_section(Some("LOGS SETTINGS"))
-        .set("directory", "logs");
+        .set("directory", config.logs_directory);
     conf.write_to_file(CONFIG_FILE).unwrap();
 }
 
@@ -117,6 +132,7 @@ fn change_domain() -> String {
     while ipv4_regex.is_match(&*buff) == false
         && ipv6_regex.is_match(&*buff) == false
         && domain_regex.is_match(&*buff) == false
+        && buff != String::from("localhost")
     {
         buff = String::from("");
         println!("Enter a valid domain (or IP address)");
