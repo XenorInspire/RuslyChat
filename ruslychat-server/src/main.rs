@@ -17,8 +17,9 @@ struct User {
 }
 
 fn main() -> Result<()> {
+    let tcp_config = init::check_init_file();
     let config = init::check_init_file();
-    tcp_listening::start_listening(config);
+    tcp_listening::start_listening(tcp_config);
 
     let url: &str = "mysql://rust:rust@localhost:3306/ruslychat";
     let opts: Opts = Opts::from_url(url)?;
