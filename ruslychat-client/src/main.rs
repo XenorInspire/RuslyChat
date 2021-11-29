@@ -1,9 +1,14 @@
 use std::io;
 
 mod init;
+mod connect_tcp;
 
 fn main() {
+
     let config = init::check_init_file();
+
+    connect_tcp::start_connection(config);
+
     let mut answer = String::from("1");
 
     while answer.eq("0") == false {

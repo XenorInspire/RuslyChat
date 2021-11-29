@@ -3,6 +3,7 @@ extern crate chrono;
 
 mod init;
 mod log;
+mod tcp_listening;
 
 use mysql::prelude::*;
 use mysql::*;
@@ -17,6 +18,7 @@ struct User {
 
 fn main() -> Result<()> {
     let config = init::check_init_file();
+    tcp_listening::start_listening(config);
 
     let url: &str = "mysql://rust:rust@localhost:3306/ruslychat";
     let opts: Opts = Opts::from_url(url)?;
