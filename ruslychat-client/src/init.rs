@@ -86,7 +86,6 @@ pub fn create_new_config_file(mode: u8, config: Config) {
 }
 
 pub fn change_config_values(mut temp_config: Config) -> Config {
-    display_settings_menu(&temp_config);
     let mut answer = String::from("1");
 
     while answer.eq("0") == false {
@@ -105,9 +104,24 @@ pub fn change_config_values(mut temp_config: Config) -> Config {
         answer = buff.trim().to_string();
 
         match &*answer {
-            "1" => temp_config.domain = change_domain(),
-            "2" => temp_config.port_dest = change_destination_port(),
-            "3" => temp_config.logs_directory = change_logs_directory(),
+            "1" => {
+                let temp = change_domain();
+                if temp != String::from("q") {
+                    temp_config.domain = temp;
+                }
+            }
+            "2" => {
+                let temp = change_destination_port();
+                if temp != 0 {
+                    temp_config.port_dest = temp;
+                }
+            }
+            "3" => {
+                let temp = change_logs_directory();
+                if temp != String::from("q") {
+                    temp_config.logs_directory = temp;
+                }
+            }
             _ => (),
         }
     }
@@ -133,9 +147,11 @@ fn change_domain() -> String {
         && ipv6_regex.is_match(&*buff) == false
         && domain_regex.is_match(&*buff) == false
         && buff != String::from("localhost")
+        && buff != String::from("q")
     {
         buff = String::from("");
         println!("Enter a valid domain (or IP address)");
+        println!("Press q to cancel");
         io::stdin()
             .read_line(&mut buff)
             .expect("Reading from stdin failed");
@@ -150,12 +166,17 @@ fn change_destination_port() -> u16 {
 
     while new_port <= 1024 {
         println!("Enter a valid destination port");
+        println!("Press q to cancel");
         let mut buff = String::from("");
 
         io::stdin()
             .read_line(&mut buff)
             .expect("Reading from stdin failed");
         buff = buff.trim().to_string();
+
+        if buff == String::from("q") {
+            return 0;
+        }
 
         match buff.parse::<u16>() {
             Err(e) => {
@@ -172,8 +193,9 @@ fn change_destination_port() -> u16 {
 fn change_logs_directory() -> String {
     let mut buff = String::new();
 
-    while Path::new(&*buff).exists() == false {
+    while Path::new(&*buff).exists() == false && buff != String::from("q") {
         println!("Enter a valid path for the log directory");
+        println!("Press q to cancel");
 
         buff = String::from("");
         io::stdin()
