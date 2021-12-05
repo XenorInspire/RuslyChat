@@ -1,13 +1,12 @@
 use std::io;
 
-mod init;
 mod connect_tcp;
+mod init;
 
 fn main() {
-
     let config = init::check_init_file();
 
-    connect_tcp::start_connection(config);
+    //connect_tcp::start_connection(config);
 
     let mut config = init::check_init_file();
     let backup = config.clone();
@@ -26,6 +25,7 @@ fn main() {
         answer = buff.trim().to_string();
 
         match &*answer {
+            "1" => connect_tcp::key_exchange(config.clone()),
             "2" => {
                 config = init::change_config_values(config);
                 if config != backup {
