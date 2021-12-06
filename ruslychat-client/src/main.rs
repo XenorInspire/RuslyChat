@@ -1,4 +1,7 @@
 use std::io;
+use std::str;
+use rand::rngs::OsRng;
+use rsa::{PaddingScheme, PublicKey, RsaPrivateKey, RsaPublicKey};
 
 mod connect_tcp;
 mod init;

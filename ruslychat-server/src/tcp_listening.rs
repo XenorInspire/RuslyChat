@@ -2,11 +2,9 @@ use std::io::{ErrorKind, Read, Write};
 use std::net::TcpListener;
 use std::sync::mpsc;
 use std::thread;
-
-extern crate openssl;
-
-use openssl::rsa::{Padding, Rsa};
-use openssl::symm::Cipher;
+use rand::rngs::OsRng;
+use rsa::{PaddingScheme, PublicKey, RsaPrivateKey, RsaPublicKey};
+use std::str;
 
 use crate::init;
 
@@ -89,4 +87,12 @@ pub fn start_listening (config: init::Config) {
 
         thread::sleep(::std::time::Duration::from_millis(100));
     }
+}
+
+pub fn encrypt_message(message:&str, mut rng:rand::rngs::OsRng, pub_key:rsa::RsaPublicKey) -> std::vec::Vec<u8> {
+    pub_key.encrypt(&mut rng, PaddingScheme::new_pkcs1v15_encrypt(), &message.as_bytes()).expect("failed to encrypt")
+}
+
+pub fn decrypt_message(message:std::vec::Vec<u8>, priv_key:rsa::RsaPrivateKey) -> String{
+    String::from_utf8(priv_key.decrypt(PaddingScheme::new_pkcs1v15_encrypt(), &message).expect("failed to decrypt")).unwrap()
 }
