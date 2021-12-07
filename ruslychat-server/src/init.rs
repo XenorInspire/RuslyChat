@@ -15,6 +15,19 @@ pub struct Config {
     pub passwd: String,
 }
 
+// Implement the clone function to the struct Config
+impl Clone for Config {
+    fn clone(&self) -> Self {
+        Config {
+            port: self.port.clone(),
+            logs_directory: self.logs_directory.clone(),
+            database: self.database.clone(),
+            user: self.user.clone(),
+            passwd: self.passwd.clone()
+        }
+    }
+}
+
 pub fn check_init_file() -> Config {
     if Path::new(CONFIG_FILE).exists() == true {
         return parse_init_file();

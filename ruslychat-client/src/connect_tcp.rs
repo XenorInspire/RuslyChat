@@ -1,19 +1,19 @@
+use crate::init;
+use rand::rngs::OsRng;
+use rsa::{PaddingScheme, PublicKey, RsaPrivateKey, RsaPublicKey, pkcs1::ToRsaPublicKey};
 use std::io::{self, ErrorKind, Read, Write};
 use std::net::TcpStream;
 use std::sync::mpsc::{self, TryRecvError};
 use std::thread;
 use std::time::Duration;
 
-extern crate openssl;
-
-use openssl::rsa::{Padding, Rsa};
-use openssl::symm::Cipher;
-
-use crate::init;
-
 const MSG_SIZE: usize = 500;
 
-pub fn start_connection(config: init::Config) {
+pub fn start_connection(
+    config: init::Config,
+    priv_key: rsa::RsaPrivateKey,
+    pub_key: rsa::RsaPublicKey,
+) {
     let mut client = TcpStream::connect(format!(
         "{}:{}",
         config.domain,
@@ -25,6 +25,7 @@ pub fn start_connection(config: init::Config) {
         .expect("Failed to initiate non-blocking");
 
     let (tx, rx) = mpsc::channel::<String>();
+    let mut is_key_sent: bool = false;
 
     thread::spawn(move || loop {
         let mut buff = vec![0; MSG_SIZE];
@@ -56,13 +57,20 @@ pub fn start_connection(config: init::Config) {
         thread::sleep(Duration::from_millis(100));
     });
 
-    println!("Write a Message:");
+    println!("Write a message :");
     loop {
-        let mut buff = String::new();
-        io::stdin()
-            .read_line(&mut buff)
-            .expect("Reading from stdin failed");
-        let msg = buff.trim().to_string();
+        let msg;
+        if is_key_sent == false {
+            msg = format!("pk={:?}", ToRsaPublicKey::to_pkcs1_pem(&pub_key));
+            println!("{}", msg);
+            is_key_sent = true;
+        } else {
+            let mut buff = String::new();
+            io::stdin()
+                .read_line(&mut buff)
+                .expect("Reading from stdin failed");
+            msg = buff.trim().to_string();
+        }
         if msg == "!quit" || tx.send(msg).is_err() {
             break;
         }
@@ -70,86 +78,25 @@ pub fn start_connection(config: init::Config) {
     println!("bye bye!");
 }
 
-pub fn key_exchange(config: init::Config) {
-    let passphrase = "client_rust_by_example";
-
-    let rsa = Rsa::generate(1024).unwrap();
-    let private_key: Vec<u8> = rsa
-        .private_key_to_pem_passphrase(Cipher::aes_128_cbc(), passphrase.as_bytes())
-        .unwrap();
-    let public_key: Vec<u8> = rsa.public_key_to_pem().unwrap();
-
-    let rsa = Rsa::public_key_from_pem(&public_key).unwrap();
-    let mut buf: Vec<u8> = vec![0; rsa.size() as usize];
-    let _ = rsa
-        .public_encrypt(passphrase.as_bytes(), &mut buf, Padding::PKCS1)
-        .unwrap();
-    //println!("Encrypted: {:?}", buf);
-
-    let data = buf;
-
-    // Decrypt with private key
-    let rsa = Rsa::private_key_from_pem_passphrase(&private_key, passphrase.as_bytes()).unwrap();
-    let mut buf: Vec<u8> = vec![0; rsa.size() as usize];
-    let _ = rsa
-        .private_decrypt(&data, &mut buf, Padding::PKCS1)
-        .unwrap();
-    //println!("Decrypted: {}", String::from_utf8(buf).unwrap());
-
-    let mut client = TcpStream::connect(format!(
-        "{}:{}",
-        config.domain,
-        config.port_dest.to_string()
-    ))
-    .expect("Connection failed, check your internet connection");
-    client
-        .set_nonblocking(true)
-        .expect("Failed to initiate non-blocking");
-
-    let (tx, rx) = mpsc::channel::<String>();
-
-    thread::spawn(move || loop {
-        let mut buff = vec![0; MSG_SIZE];
-        println!("test");
-        match client.read_exact(&mut buff) {
-            Ok(_) => {
-                
-                let msg = buff.into_iter().take_while(|&x| x != 0).collect::<Vec<_>>();
-                println!("Server : {}", String::from_utf8(msg).expect("Error: key"));
-            }
-            Err(ref err) if err.kind() == ErrorKind::WouldBlock => (),
-            Err(_) => {
-                println!("Connection lost");
-                break;
-            }
-        }
-
-        match rx.try_recv() {
-            Ok(msg) => {
-                let mut buff = msg.clone().into_bytes();
-                buff.resize(MSG_SIZE, 0);
-                client
-                    .write_all(&buff)
-                    .expect("Error, your message can't be sent. Socket Failed.");
-                println!("message sent {:?}", msg);
-            }
-            Err(TryRecvError::Empty) => (),
-            Err(TryRecvError::Disconnected) => break,
-        }
-
-        thread::sleep(Duration::from_millis(100));
-    });
-
-    let string_public_key = String::from_utf8(public_key).unwrap();
-    //println!("Client : {}", String::from_utf8(private_key).unwrap());
-    println!("Client : {}", string_public_key.clone());
-    tx.send(string_public_key);
+pub fn encrypt_message(
+    message: &str,
+    mut rng: rand::rngs::OsRng,
+    pub_key: rsa::RsaPublicKey,
+) -> std::vec::Vec<u8> {
+    pub_key
+        .encrypt(
+            &mut rng,
+            PaddingScheme::new_pkcs1v15_encrypt(),
+            &message.as_bytes(),
+        )
+        .expect("failed to encrypt")
 }
 
-pub fn encrypt_message(message:&str, mut rng:rand::rngs::OsRng, pub_key:rsa::RsaPublicKey) -> std::vec::Vec<u8> {
-    pub_key.encrypt(&mut rng, PaddingScheme::new_pkcs1v15_encrypt(), &message.as_bytes()).expect("failed to encrypt")
-}
-
-pub fn decrypt_message(message:std::vec::Vec<u8>, priv_key:rsa::RsaPrivateKey) -> String{
-    String::from_utf8(priv_key.decrypt(PaddingScheme::new_pkcs1v15_encrypt(), &message).expect("failed to decrypt")).unwrap()
+pub fn decrypt_message(message: std::vec::Vec<u8>, priv_key: rsa::RsaPrivateKey) -> String {
+    String::from_utf8(
+        priv_key
+            .decrypt(PaddingScheme::new_pkcs1v15_encrypt(), &message)
+            .expect("failed to decrypt"),
+    )
+    .unwrap()
 }

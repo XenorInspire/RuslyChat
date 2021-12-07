@@ -1,15 +1,13 @@
-use std::io;
-use std::str;
 use rand::rngs::OsRng;
 use rsa::{PaddingScheme, PublicKey, RsaPrivateKey, RsaPublicKey};
+use std::io;
+use std::str;
 
 mod connect_tcp;
 mod init;
 
 fn main() {
     let config = init::check_init_file();
-
-    //connect_tcp::start_connection(config);
 
     let mut config = init::check_init_file();
     let mut backup = config.clone();
@@ -28,7 +26,13 @@ fn main() {
         answer = buff.trim().to_string();
 
         match &*answer {
-            "1" => connect_tcp::key_exchange(config.clone()),
+            "1" => {
+                let mut rng = OsRng;
+                let priv_key =
+                    RsaPrivateKey::new(&mut rng, 2048).expect("failed to generate a key");
+                let pub_key = RsaPublicKey::from(&priv_key);
+                connect_tcp::start_connection(config.clone(), priv_key, pub_key);
+            }
             "2" => {
                 config = init::change_config_values(config);
                 if config != backup {
