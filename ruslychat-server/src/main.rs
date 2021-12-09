@@ -11,13 +11,6 @@ use mysql::prelude::*;
 use mysql::*;
 use rand::rngs::OsRng;
 use rsa::{PaddingScheme, PublicKey, RsaPrivateKey, RsaPublicKey};
-use std::str;
-
-struct User {
-    email: String,
-    username: String,
-    password: String,
-}
 
 fn main() {
 
@@ -40,24 +33,6 @@ fn main() {
 
     
     tcp_listening::start_listening(config.clone(), priv_key, pub_key);
-
-    // let url: &str = "mysql://rust:rust@localhost:3306/ruslychat";
-    // let opts: Opts = Opts::from_url(url)?;
-
-    // let pool: Pool = Pool::new(opts)?;
-    // let mut conn: PooledConn = pool.get_conn()?;
-
-    // let users = vec![
-    //     User { email: "coucou".to_string(), username: "toto".to_string(), password: "coucouToto".to_string() },
-    // ];
-
-    // conn.exec_batch(r"INSERT INTO user (email, username, password) VALUES (:email, :username, AES_ENCRYPT(:password, 'ruslychatAKATheBestChatEver'))",
-    //                 users.iter().map(|p| params! {
-    //                     "email" => p.email.clone(),
-    //                     "username" => p.username.clone(),
-    //                     "password" => p.password.clone(),
-    //                 })
-    // )?;
 
     let mut logger = Logger {
         path: config.logs_directory,

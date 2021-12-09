@@ -1,14 +1,11 @@
 use rand::rngs::OsRng;
 use rsa::{PaddingScheme, PublicKey, RsaPrivateKey, RsaPublicKey};
 use std::io;
-use std::str;
 
 mod connect_tcp;
 mod init;
 
 fn main() {
-    let config = init::check_init_file();
-
     let mut config = init::check_init_file();
     let mut backup = config.clone();
     let mut answer = String::from("1");
