@@ -10,7 +10,7 @@ fn main() {
     connect_tcp::start_connection(config);
 
     let mut config = init::check_init_file();
-    let backup = config.clone();
+    let mut backup = config.clone();
     let mut answer = String::from("1");
 
     while answer.eq("0") == false {
@@ -29,7 +29,8 @@ fn main() {
             "2" => {
                 config = init::change_config_values(config);
                 if config != backup {
-                    init::create_new_config_file(init::CURRENT_CONFIG_FILE_MODE, config.clone())
+                    init::create_new_config_file(init::CURRENT_CONFIG_FILE_MODE, config.clone());
+                    backup = config.clone();
                 }
             }
             _ => (),

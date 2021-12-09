@@ -76,7 +76,7 @@ fn create_new_config_file() {
         .set("directory", "logs");
     conf.with_section(Some("DATABASE SETTINGS"))
         .set("database", "rusly_db")
-        .set("user", "rusly")  
-        .set("passwd", "root");   
+        .set("user", "rusly")
+        .set("passwd", "root");
     conf.write_to_file(CONFIG_FILE).unwrap();
 }
