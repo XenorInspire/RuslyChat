@@ -1,21 +1,21 @@
-use std::path::Path;
+use chrono::{DateTime, Utc};
 use std::fs;
 use std::fs::OpenOptions;
 use std::io::Write;
-use chrono::{DateTime, Utc};
+use std::path::Path;
 
 pub enum LogLevel {
     FATAL,
     ERROR,
     INFO,
     TRACE,
-    DEBUG
+    DEBUG,
 }
 
 pub struct Logger {
     pub path: String,
     pub log_file: String,
-    pub max_size: u16
+    pub max_size: u16,
 }
 
 impl Logger {
@@ -64,7 +64,7 @@ fn get_log_file_name(path: String) -> String {
     let now: DateTime<Utc> = Utc::now();
     let time = now.format("%Y%m%d%H%M%S").to_string();
 
-    path + "/ruslychat_"  + &*time + ".log"
+    path + "/ruslychat_" + &*time + ".log"
 }
 
 fn check_log_directory(path: String) -> bool {

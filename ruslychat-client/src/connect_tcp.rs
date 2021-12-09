@@ -1,6 +1,6 @@
 use crate::init;
 use rand::rngs::OsRng;
-use rsa::{PaddingScheme, PublicKey, RsaPrivateKey, RsaPublicKey, pkcs1::ToRsaPublicKey};
+use rsa::{pkcs1::ToRsaPublicKey, PaddingScheme, PublicKey, RsaPrivateKey, RsaPublicKey};
 use std::io::{self, ErrorKind, Read, Write};
 use std::net::TcpStream;
 use std::sync::mpsc::{self, TryRecvError};
@@ -25,14 +25,13 @@ pub fn start_connection(
         .expect("Failed to initiate non-blocking");
 
     let (tx, rx) = mpsc::channel::<String>();
-    let mut is_key_sent: bool = false;
 
     thread::spawn(move || loop {
         let mut buff = vec![0; MSG_SIZE];
         match client.read_exact(&mut buff) {
             Ok(_) => {
                 let msg = buff.into_iter().take_while(|&x| x != 0).collect::<Vec<_>>();
-                println!("message recv {:?}", msg);
+                // println!("message recv {:?}", msg);
             }
             Err(ref err) if err.kind() == ErrorKind::WouldBlock => (),
             Err(_) => {
@@ -48,7 +47,7 @@ pub fn start_connection(
                 client
                     .write_all(&buff)
                     .expect("Error, your message can't be sent. Socket Failed.");
-                println!("message sent {:?}", msg);
+                println!("--> {:?}", msg);
             }
             Err(TryRecvError::Empty) => (),
             Err(TryRecvError::Disconnected) => break,
@@ -58,10 +57,11 @@ pub fn start_connection(
     });
 
     println!("Write a message :");
+    let mut is_key_sent: bool = false;
     loop {
         let msg;
         if is_key_sent == false {
-            msg = format!("pk={:?}", ToRsaPublicKey::to_pkcs1_pem(&pub_key));
+            msg = ToRsaPublicKey::to_pkcs1_pem(&pub_key).unwrap();
             println!("{}", msg);
             is_key_sent = true;
         } else {

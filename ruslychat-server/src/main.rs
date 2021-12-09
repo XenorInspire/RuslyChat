@@ -13,8 +13,8 @@ use rand::rngs::OsRng;
 use rsa::{PaddingScheme, PublicKey, RsaPrivateKey, RsaPublicKey};
 
 fn main() {
-
     let config = init::check_init_file();
+    println!("The server is starting...");
     
     // Encryption POC
     let mut rng = OsRng;
@@ -31,7 +31,6 @@ fn main() {
     //let decrypted_message = tcp_listening::decrypt_message(encrypted_message, priv_key);
     //println!("{:?}", &decrypted_message);
 
-    
     tcp_listening::start_listening(config.clone(), priv_key, pub_key);
 
     let mut logger = Logger {
