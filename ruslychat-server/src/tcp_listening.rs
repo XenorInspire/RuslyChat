@@ -1,5 +1,5 @@
 use rand::rngs::OsRng;
-use rsa::{PaddingScheme, PublicKey, RsaPrivateKey, RsaPublicKey};
+use rsa::{PaddingScheme, PublicKey, RsaPrivateKey, RsaPublicKey, pkcs1::FromRsaPublicKey};
 use std::io::{ErrorKind, Read, Write};
 use std::net::TcpListener;
 use std::str;
@@ -10,7 +10,11 @@ use crate::init;
 
 const MSG_SIZE: usize = 500;
 
-pub fn start_listening(config: init::Config, priv_key: rsa::RsaPrivateKey, pub_key: rsa::RsaPublicKey) {
+pub fn start_listening(
+    config: init::Config,
+    priv_key: rsa::RsaPrivateKey,
+    pub_key: rsa::RsaPublicKey,
+) {
     let server = TcpListener::bind(format!("0.0.0.0:{}", config.port.to_string()))
         .expect("Listener failed to bind");
     server
@@ -27,6 +31,7 @@ pub fn start_listening(config: init::Config, priv_key: rsa::RsaPrivateKey, pub_k
 
             let tx = tx.clone();
             clients.push(socket.try_clone().expect("Failed to clone client"));
+            let mut is_key_sent: bool = false;
 
             thread::spawn(move || loop {
                 let mut buff = vec![0; MSG_SIZE];
@@ -34,6 +39,15 @@ pub fn start_listening(config: init::Config, priv_key: rsa::RsaPrivateKey, pub_k
                     Ok(_) => {
                         let msg = buff.into_iter().take_while(|&x| x != 0).collect::<Vec<_>>();
                         let msg = String::from_utf8(msg).expect("Invalid utf8 message");
+                        println!("{}", is_key_sent);
+
+                        // Check if this is the public key of the client
+                        if is_key_sent == false && msg.contains("-----BEGIN RSA PUBLIC KEY-----\n")
+                            && msg.contains("\n-----END RSA PUBLIC KEY-----\n")
+                        {
+                            is_key_sent = true;
+                            let client_pub_key = RsaPublicKey::from_pkcs1_pem(&*msg).unwrap();
+                        }
 
                         println!("{}: {:?}", addr, msg);
                         tx.send("Message recu --> ".to_string() + &msg);
