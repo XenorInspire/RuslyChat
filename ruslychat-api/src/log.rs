@@ -44,6 +44,8 @@ impl Logger {
 
             to_log += &*(get_log_time() + " : " + &*message);
 
+            println!("{}", to_log);
+
             match file.write_all(to_log.as_bytes()) {
                 Err(e) => {
                     println!("Error, can not write into {}\n{}", self.log_file, e);
