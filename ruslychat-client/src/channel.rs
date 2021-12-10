@@ -1,5 +1,9 @@
+use serde::Deserialize;
 use std::io;
+use std::collections::HashMap;
+use std::env;
 
+#[derive(Deserialize, Debug)]
 pub struct Channel {
     id: u32,
     name: String,
@@ -16,10 +20,12 @@ impl Channel {
     }
 }
 
-pub fn display_main_menu() -> u32 {
+pub fn display_main_menu(api_host: String, api_port: String) -> u32 {
     let mut answer = String::from("1");
 
-    while answer.eq("0") == false {
+    while answer.ne("0") {
+        std::process::Command::new("clear").status().unwrap();
+
         println!("========================\n       Main Menu       \n========================");
         println!("1 : Open");
         println!("2 : New");
@@ -33,11 +39,11 @@ pub fn display_main_menu() -> u32 {
 
         match &*answer {
             "1" => {
-                display_channel_menu();
+                display_channel_menu(api_host.clone(), api_port.clone());
             },
             "2" => {
                 println!("Coming soon...");
-                display_main_menu();
+                display_main_menu(api_host.clone(), api_port.clone());
                 break;
             },
             _ => (),
@@ -47,21 +53,39 @@ pub fn display_main_menu() -> u32 {
     0
 }
 
-fn display_channel_menu() {
+fn display_channel_menu(api_host: String, api_port: String) -> Result<(), Box<dyn std::error::Error>> {
     let mut answer = String::from("1");
-    let channels = vec![
-        Channel{ id: 10, name: "channel1".to_string(), description: "".to_string() },
-        Channel{ id: 20, name: "channel2".to_string(), description: "".to_string() },
-        Channel{ id: 30, name: "channel3".to_string(), description: "".to_string() },
-    ];
-    //TODO get list of channels from API
+    let mut post_data = HashMap::new();
 
-    while answer.eq("0") == false {
+    post_data.insert("token", env::var("token").unwrap());
+    post_data.insert("action", String::from("get"));
+    post_data.insert("id", String::from("all"));
+
+    //TODO add status if I can not hit URL
+    let client = reqwest::blocking::Client::new();
+    let res = client.post("http://".to_owned() + &*api_host + ":" + &*api_port + "/api/channel")
+        .json(&post_data)
+        .send()?
+        .json::<HashMap<String, String>>()?;
+
+    let mut channels: Vec<Channel> = Vec::new();
+
+    match res.get("channels") {
+        Some(c) => {
+            channels = serde_json::from_str(c).unwrap();
+        },
+        _ => ()
+    }
+
+    while answer.ne("0") {
         let mut buff = String::new();
 
+        std::process::Command::new("clear").status().unwrap();
+
         println!("========================\n     Channel List      \n========================");
+        println!("0 : Exit");
         for channel in &channels {
-            println!("{} {}", channel.id, channel.name);
+            println!("{} : {}", channel.id, channel.name);
         }
 
         io::stdin()
@@ -86,4 +110,6 @@ fn display_channel_menu() {
             }
         }*/
     }
+
+    Ok(())
 }

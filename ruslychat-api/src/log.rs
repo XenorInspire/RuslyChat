@@ -1,5 +1,5 @@
 use std::path::Path;
-use std::fs;
+use std::{fs, env};
 use std::fs::OpenOptions;
 use std::io::Write;
 use chrono::{DateTime, Utc};
@@ -23,6 +23,7 @@ impl Logger {
         if check_log_directory(self.path.clone()) {
             if self.log_file == "" {
                 self.log_file = get_log_file_name(self.path.clone());
+                env::set_var("LOG_FILE", self.log_file.clone());
             }
 
             let mut file = OpenOptions::new()

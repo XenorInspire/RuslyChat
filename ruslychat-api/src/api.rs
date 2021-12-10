@@ -23,107 +23,117 @@ pub fn user_login() -> warp::filter::map::Map {
         .and(warp::post())
         .and(warp::body::json())
         .map(|request_data: HashMap<String, String>| {
-            let unhashed_pwd = request_data.clone();
+            let user_data = request_data.clone();
+            let mut return_data_json: HashMap<_, String> = HashMap::new();
 
-            let mut rs_data: HashMap<_, _> = HashMap::new();
-            let mut rs_data2 = rs_data.clone();
-
+            // For sending result from thread
             let (tx, rx) = mpsc::channel();
 
-            // Check password
+            // Checking password in thread
             let thread = thread::spawn(move || -> Result<()> {
+                let config = init::check_init_file();
+
+                let mut logger = Logger {
+                    path: config.logs_directory,
+                    log_file: "".to_string(),
+                    max_size: 10
+                };
+
+                let mut user_given_login = String::new();
+                match user_data.get("login") {
+                    Some(value) => user_given_login = value.to_string(),
+                    None => (),
+                }
+
+                //DEBUG
+                logger.log(format!("given login: {}", user_given_login), LogLevel::DEBUG);
+                //println!("given login: {}", user_given_login);
+
+
                 // Database connection
-                let url: &str = "mysql://root:root@localhost:3306/rusly_db";
-                let opts: Opts = Opts::from_url(url)?;
+                let url: String = "mysql://".to_owned() + &*config.user + ":" + &*config.passwd + "@localhost:3306/" + &*config.database;
+                let opts: Opts = Opts::from_url(&*url)?;
                 let pool: Pool = Pool::new(opts)?;
                 let mut conn: PooledConn = pool.get_conn()?;
 
                 // SQL Request
-                let stmt = conn.prep("SELECT * FROM `user` WHERE `id` = :id ")?;
+                let req_select_user = conn.prep("SELECT * FROM `user` WHERE `email` = :email OR `username` = :username ")?;
 
                 // Response
-                let res: Vec<mysql::Row> = conn.exec(
-                    &stmt,
+                let res_select_user: Vec<mysql::Row> = conn.exec(
+                    &req_select_user,
                     params! {
-                        "id" => 1,
+                        "email" => user_given_login.clone(),
+                        "username" => user_given_login,
                     },
                 )?;
 
+                //DEBUG
+                println!("res_select_user: {:?}", res_select_user);
+
                 // Parsing response
-                for row in res {
-                    // Getting the hash value and compare with the hashed password given WIP
+                let mut hash_from_db = String::new();
+                let mut id_from_db: u32 = 0;
 
-                    // Getting hash from db
-                    let password_from_db = unhashed_pwd.get("pwd");
-                    let mut hash_from_db = String::new();
-
-                    match password_from_db {
-                        Some(value) => hash_from_db = value.to_string(),
-                        None => (),
-                    }
-
-                    println!("{}", hash_from_db);
-
-                    //Hashing the password
-                    let given_password = request_data.get("pwd");
-                    let mut user_password = String::new();
-                    match given_password {
-                        Some(value) => user_password = value.to_string(),
-                        None => (),
-                    }
-                    println!("{}", user_password);
-
-                    let hash_setup = "$6$salt";
-                    let hashed_pwd = sha512_crypt::hash_with(hash_setup, user_password).unwrap();
-                    println!("{}", hashed_pwd);
-
-                    // Good password
-                    if hashed_pwd == hash_from_db {
-                        let test = HashMap::from([("Response", "Ok")]);
-                        warp::reply::json(&test);
-                    } else {
-                        let test = HashMap::from([("Response", "Ko")]);
-                        warp::reply::json(&test);
-                    }
-                    // println!("{:?}",row);
-                    // println!("{:?}",row.unwrap().get(0).take());
-                    // println!("{:?}",row.unwrap().get(0));
+                //Hashing the password given
+                let given_password = request_data.get("password");
+                let mut user_password = String::new();
+                match given_password {
+                    Some(value) => user_password = value.to_string(),
+                    None => (),
                 }
+                println!("user given password: {}", user_password);
 
-                //rs_data = HashMap::from([("Response", "thread")]);
-                rs_data.insert("Response", "thread");
-                let val = String::from("hi");
-                tx.send(rs_data).unwrap();
-                // return warp::reply::json(&test);
+                let hash_setup = "$6$salt";
+                let hashed_given_pwd = sha512_crypt::hash_with(hash_setup, user_password).unwrap();
+                println!("hashed user given password: {}", hashed_given_pwd);
+
+                for mut row in res_select_user {
+                    //DEBUG
+                    println!("First value of res_select_user: {:?}", row);
+                    // Getting hashed from db
+                    id_from_db = row.take("id").unwrap();
+                    hash_from_db = row.take("password").unwrap();
+                }
+                // Good password
+                if hashed_given_pwd == hash_from_db {
+                    // Generating the token WIP
+                    let token: String = rand::thread_rng()
+                        .sample_iter(&Alphanumeric)
+                        .take(150)
+                        .map(char::from)
+                        .collect();
+
+                    println!("token: {}", token);
+
+                    // SQL Request
+                    let req_update_user_token = conn.prep("UPDATE `user` SET `token` = :token WHERE `id` = :id")?;
+
+                    // Response
+                    let res_update_user_token: Vec<mysql::Row> = conn.exec(
+                        &req_update_user_token,
+                        params! {
+                            "token" => token.clone(),
+                            "id" => id_from_db
+                        },
+                    )?;
+                    // ..........................//
+
+                    return_data_json.insert("connection", "Success".to_string());
+                    return_data_json.insert("token", token);
+                    tx.send(return_data_json).unwrap();
+                } else {
+                    return_data_json.insert("connection", "Refused".to_string());
+                    tx.send(return_data_json).unwrap();
+                }
                 Ok(())
             });
 
+            // Getting result from tread
             let received = rx.recv().unwrap();
-            println!("Got: {:?}", received);
-
-            // let mut rs_data2: HashMap<_, _>;
-            // rs_data2.clear();
-            // rs_data2.extend(rs_data.into_iter());
-
-            // rs_data2.clone_from(&rs_data);
-
-            // println!("{:?}", rs_data);
-            // let rs_data2 = rs_data.clone();
-
-            // rs_data2.extend(rs_data.iter().cloned());
+            // Sending final result
             return warp::reply::json(&received);
-
-            // let test1 = HashMap::from([(json_field, json_value)]);
-            // if true {
-            //     return warp::reply::json(&test1);
-            // }
-
-            // let json = json::encode(&request_data).unwrap();
-            let test = HashMap::from([("Response", "OkGood")]);
-            warp::reply::json(&test)
-
-            // warp::reply::json(&request_data)
         });
 
-    return user_login;
+    user_login
 }

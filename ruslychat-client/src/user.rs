@@ -1,5 +1,6 @@
 use crate::channel;
 use crate::init;
+
 use std::io;
 use std::env;
 use std::collections::HashMap;
@@ -11,6 +12,8 @@ pub fn request_login(config: Config) {
 
     while login.eq("0") || password.eq("0") {
         let mut buff = String::new();
+
+        std::process::Command::new("clear").status().unwrap();
 
         println!("Login:");
 
@@ -26,14 +29,13 @@ pub fn request_login(config: Config) {
             .expect("Reading from stdin failed");
         password = buff.trim().to_string();
     }
-    //TODO change api_port to config when available
 
-    api_login(config.domain.clone(), "6970".to_string(), login, password);
+    //TODO change api_port to config when available
+    api_login(config.domain.clone(), "6970".to_string(), login.clone(), password.clone());
 }
 
 fn api_login(api_host: String, api_port: String, login: String, password: String) -> Result<(), Box<dyn std::error::Error>> {
     let mut post_data = HashMap::new();
-    //let mut token = String::new();
 
     post_data.insert("login", login);
     post_data.insert("password", password);
@@ -66,8 +68,9 @@ fn api_login(api_host: String, api_port: String, login: String, password: String
 
         env::set_var("token", token);
 
-        channel::display_main_menu();
+        channel::display_main_menu(api_host, api_port);
     } else {
+        std::process::Command::new("clear").status().unwrap();
         println!("Connection refused!");
     }
 

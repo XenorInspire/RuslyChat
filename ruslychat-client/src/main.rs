@@ -1,4 +1,8 @@
 extern crate chrono;
+extern crate serde_derive;
+extern crate serde;
+extern crate serde_json;
+
 use std::io;
 
 mod init;
@@ -8,13 +12,11 @@ mod user;
 mod log;
 
 fn main() {
-    let config = init::check_init_file();
-
-    //connect_tcp::start_connection(config);
-
     let mut config = init::check_init_file();
     let mut backup = config.clone();
     let mut answer = String::from("1");
+
+    std::process::Command::new("clear").status().unwrap();
 
     while answer.eq("0") == false {
         println!("========================\n Welcome to RuslyChat !\n========================");
