@@ -14,6 +14,8 @@ mod log;
 fn main() {
     let mut config = init::check_init_file();
     let mut backup = config.clone();
+    unsafe {log::PATH_LOGGER = config.logs_directory.clone();}
+
     let mut answer = String::from("1");
 
     std::process::Command::new("clear").status().unwrap();
