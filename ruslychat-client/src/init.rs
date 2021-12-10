@@ -70,17 +70,12 @@ fn parse_init_file() -> Config {
 
     if check_domain(domain.to_string()) == false {
         error = true;
-        error_at_startup("Error: The IP adrress in the config file is not valid");
+        error_at_startup("Error: The IP address in the config file is not valid");
     }
 
     if check_destinaton_port(port_dest.to_string()) == false && error != true {
         error = true;
         error_at_startup("Error: The destination port in the config file is not valid");
-    }
-
-    if Path::new(logs_directory).exists() == false && error != true {
-        error = true;
-        error_at_startup("Error: The log directory in the config file is not valid");
     }
 
     if error == false {
@@ -98,9 +93,10 @@ fn parse_init_file() -> Config {
     }
 }
 
+// This function is charged to warn the user that the config file is invalid/corrupted
 fn error_at_startup(error_msg: &str) {
     println!("{}", error_msg);
-    println!("Press n to generate new config file, otherwise, RuslyChat will shutdown :/");
+    println!("Press n to generate new config file, otherwise RuslyChat will shutdown :/");
     let mut buff = String::new();
     io::stdin()
         .read_line(&mut buff)
@@ -127,19 +123,6 @@ pub fn create_new_config_file(mode: u8, config: Config) {
             match f {
                 Err(e) => {
                     println!("Error, the config file can't be created\n{}", e);
-                    let duration = time::Duration::from_secs(2);
-                    thread::sleep(duration);
-                    process::exit(0);
-                }
-                _ => (),
-            }
-        }
-
-        if Path::new("logs").exists() == false {
-            let f = fs::create_dir_all("logs");
-            match f {
-                Err(e) => {
-                    println!("Error, the log directory can't be created\n{}", e);
                     let duration = time::Duration::from_secs(2);
                     thread::sleep(duration);
                     process::exit(0);
