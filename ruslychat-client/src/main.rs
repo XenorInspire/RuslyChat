@@ -4,6 +4,7 @@ mod init;
 mod connect_tcp;
 mod channel;
 mod user;
+mod log;
 
 fn main() {
     let config = init::check_init_file();
