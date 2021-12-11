@@ -31,7 +31,6 @@ use rand::distributions::Alphanumeric;
 use warp::http::StatusCode;
 use warp::Filter;
 use std::iter::FromIterator;
-use chrono::DateTime;
 
 #[derive(Serialize, Debug)]
 struct Channel {
@@ -217,12 +216,8 @@ async fn main() {
                 let pool: Pool = Pool::new(opts)?;
                 let mut conn: PooledConn = pool.get_conn()?;
 
-                let get = String::from("get");
-                let del = String::from("del");
-                let set = String::from("set");
-
-                match channel_data.get("action") {
-                    Some(get) => {
+                match channel_data.get("action").unwrap().as_ref() {
+                    "get" => {
                         let mut channel_given_id = String::new();
                         let mut channel_given_token = String::new();
 
@@ -291,6 +286,12 @@ async fn main() {
 
                         return_data_json.insert("channels", channels_serialized);
                     },
+                    "del" => {
+
+                    },
+                    "set" => {
+
+                    }
                     _ => logger.log("Channel action does not exist".to_string(), LogLevel::ERROR)
                 }
 
@@ -345,11 +346,8 @@ async fn main() {
                 let pool: Pool = Pool::new(opts)?;
                 let mut conn: PooledConn = pool.get_conn()?;
 
-                let get = String::from("get");
-                let set = String::from("set");
-
-                match message_data.get("action") {
-                    Some(get) => {
+                match message_data.get("action").unwrap().as_ref() {
+                    "get" => {
                         let mut message_given_token = String::new();
                         let mut message_given_channel_id = String::new();
                         let mut message_given_count = String::new();
@@ -410,6 +408,9 @@ async fn main() {
                         println!("{:#?}", messages);
 
                         return_data_json.insert("messages", messages_serialized);
+                    },
+                    "set" => {
+
                     },
                     _ => logger.log("Message action does not exist".to_string(), LogLevel::ERROR)
                 }
