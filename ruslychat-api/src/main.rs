@@ -246,8 +246,8 @@ async fn main() {
                                     res_select_channel = conn.exec(
                                         &req_select_channel,
                                         params! {
-                                    "u_token" => channel_given_token,
-                                },
+                                            "u_token" => channel_given_token,
+                                        },
                                     )?;
                                 } else {
                                     // SQL Request
@@ -257,9 +257,9 @@ async fn main() {
                                     res_select_channel = conn.exec(
                                         &req_select_channel,
                                         params! {
-                                    "u_token" => channel_given_token,
-                                    "c_id" => channel_given_id,
-                                },
+                                            "u_token" => channel_given_token,
+                                            "c_id" => channel_given_id,
+                                        },
                                     )?;
                                 }
 
@@ -388,9 +388,9 @@ async fn main() {
                                 res_select_message = conn.exec(
                                     &req_select_message,
                                     params! {
-                            "u_token" => message_given_token,
-                            "c_id" => message_given_channel_id,
-                        },
+                                        "u_token" => message_given_token,
+                                        "c_id" => message_given_channel_id,
+                                    },
                                 )?;
 
                                 //DEBUG
