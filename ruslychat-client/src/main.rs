@@ -10,6 +10,7 @@ mod connect_tcp;
 mod channel;
 mod user;
 mod log;
+mod message;
 
 fn main() {
     let mut config = init::check_init_file();
