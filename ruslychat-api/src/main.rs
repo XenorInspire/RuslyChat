@@ -216,83 +216,89 @@ async fn main() {
                 let pool: Pool = Pool::new(opts)?;
                 let mut conn: PooledConn = pool.get_conn()?;
 
-                match channel_data.get("action").unwrap().as_ref() {
-                    "get" => {
-                        let mut channel_given_id = String::new();
-                        let mut channel_given_token = String::new();
+                match channel_data.get("action") {
+                    Some(action) => {
+                        match action.as_ref() {
+                            "get" => {
+                                let mut channel_given_id = String::new();
+                                let mut channel_given_token = String::new();
 
-                        match channel_data.get("id") {
-                            Some(value) => channel_given_id = value.to_string(),
-                            None => (),
-                        }
-                        println!("Given id: {}", channel_given_id);
+                                match channel_data.get("id") {
+                                    Some(value) => channel_given_id = value.to_string(),
+                                    None => (),
+                                }
+                                println!("Given id: {}", channel_given_id);
 
-                        match channel_data.get("token") {
-                            Some(value) => channel_given_token = value.to_string(),
-                            None => (),
-                        }
-                        println!("Given token: {}", channel_given_token);
+                                match channel_data.get("token") {
+                                    Some(value) => channel_given_token = value.to_string(),
+                                    None => (),
+                                }
+                                println!("Given token: {}", channel_given_token);
 
-                        let mut req_select_channel: Statement;
-                        let mut res_select_channel: Vec<mysql::Row> = Vec::new();
+                                let mut req_select_channel: Statement;
+                                let mut res_select_channel: Vec<mysql::Row> = Vec::new();
 
-                        if channel_given_id.eq("all") {
-                            // SQL Request
-                            req_select_channel = conn.prep("SELECT u.token, c.* FROM user_channel uc LEFT JOIN user u ON uc.id_user = u.id LEFT JOIN channel c ON uc.id_channel = c.id WHERE u.token = :u_token")?;
+                                if channel_given_id.eq("all") {
+                                    // SQL Request
+                                    req_select_channel = conn.prep("SELECT u.token, c.* FROM user_channel uc LEFT JOIN user u ON uc.id_user = u.id LEFT JOIN channel c ON uc.id_channel = c.id WHERE u.token = :u_token")?;
 
-                            // Response
-                            res_select_channel = conn.exec(
-                                &req_select_channel,
-                                params! {
+                                    // Response
+                                    res_select_channel = conn.exec(
+                                        &req_select_channel,
+                                        params! {
                                     "u_token" => channel_given_token,
                                 },
-                            )?;
-                        } else {
-                            // SQL Request
-                            req_select_channel = conn.prep("SELECT u.token, c.* FROM user_channel uc LEFT JOIN user u ON uc.id_user = u.id LEFT JOIN channel c ON uc.id_channel = c.id WHERE u.token = :u_token AND c.id = :c_id")?;
+                                    )?;
+                                } else {
+                                    // SQL Request
+                                    req_select_channel = conn.prep("SELECT u.token, c.* FROM user_channel uc LEFT JOIN user u ON uc.id_user = u.id LEFT JOIN channel c ON uc.id_channel = c.id WHERE u.token = :u_token AND c.id = :c_id")?;
 
-                            // Response
-                            res_select_channel = conn.exec(
-                                &req_select_channel,
-                                params! {
+                                    // Response
+                                    res_select_channel = conn.exec(
+                                        &req_select_channel,
+                                        params! {
                                     "u_token" => channel_given_token,
                                     "c_id" => channel_given_id,
                                 },
-                            )?;
+                                    )?;
+                                }
+
+                                //DEBUG
+                                println!("res_select_channel: {:?}", res_select_channel);
+
+                                // Parsing response
+                                let mut channels: Vec<_> = Vec::new();
+
+                                for mut row in res_select_channel {
+                                    // Getting channel from db
+                                    println!("value of res_select_channel: {:?}", row);
+
+                                    let channel = Channel {
+                                        id: row.take("id").unwrap(),
+                                        name: row.take("name").unwrap(),
+                                        description: row.take("description").unwrap()
+                                    };
+
+                                    channels.push(channel);
+                                }
+
+                                let channels_serialized = serde_json::to_string(&channels).unwrap();
+                                println!("Serialized channels: {}", channels_serialized);
+                                println!("{:#?}", channels);
+
+                                return_data_json.insert("channels", channels_serialized);
+                            },
+                            "del" => {
+
+                            },
+                            "set" => {
+
+                            },
+                            _ => logger.log("Channel action does not exist".to_string(), LogLevel::ERROR)
                         }
 
-                        //DEBUG
-                        println!("res_select_channel: {:?}", res_select_channel);
-
-                        // Parsing response
-                        let mut channels: Vec<_> = Vec::new();
-
-                        for mut row in res_select_channel {
-                            // Getting channel from db
-                            println!("value of res_select_channel: {:?}", row);
-
-                            let channel = Channel {
-                                id: row.take("id").unwrap(),
-                                name: row.take("name").unwrap(),
-                                description: row.take("description").unwrap()
-                            };
-
-                            channels.push(channel);
-                        }
-
-                        let channels_serialized = serde_json::to_string(&channels).unwrap();
-                        println!("Serialized channels: {}", channels_serialized);
-                        println!("{:#?}", channels);
-
-                        return_data_json.insert("channels", channels_serialized);
                     },
-                    "del" => {
-
-                    },
-                    "set" => {
-
-                    }
-                    _ => logger.log("Channel action does not exist".to_string(), LogLevel::ERROR)
+                    _ => ()
                 }
 
                 tx.send(return_data_json).unwrap();
@@ -346,73 +352,78 @@ async fn main() {
                 let pool: Pool = Pool::new(opts)?;
                 let mut conn: PooledConn = pool.get_conn()?;
 
-                match message_data.get("action").unwrap().as_ref() {
-                    "get" => {
-                        let mut message_given_token = String::new();
-                        let mut message_given_channel_id = String::new();
-                        let mut message_given_count = String::new();
+                match message_data.get("action") {
+                    Some(action) => {
+                        match action.as_ref() {
+                            "get" => {
+                                let mut message_given_token = String::new();
+                                let mut message_given_channel_id = String::new();
+                                let mut message_given_count = String::new();
 
-                        match message_data.get("token") {
-                            Some(value) => message_given_token = value.to_string(),
-                            None => (),
-                        }
-                        println!("Given token: {}", message_given_token);
+                                match message_data.get("token") {
+                                    Some(value) => message_given_token = value.to_string(),
+                                    None => (),
+                                }
+                                println!("Given token: {}", message_given_token);
 
-                        match message_data.get("id") {
-                            Some(value) => message_given_channel_id = value.to_string(),
-                            None => (),
-                        }
-                        println!("Given channel id: {}", message_given_channel_id);
+                                match message_data.get("id") {
+                                    Some(value) => message_given_channel_id = value.to_string(),
+                                    None => (),
+                                }
+                                println!("Given channel id: {}", message_given_channel_id);
 
-                        match message_data.get("count") {
-                            Some(value) => message_given_count = value.to_string(),
-                            None => (),
-                        }
-                        println!("Given count: {}", message_given_count);
+                                match message_data.get("count") {
+                                    Some(value) => message_given_count = value.to_string(),
+                                    None => (),
+                                }
+                                println!("Given count: {}", message_given_count);
 
-                        let mut req_select_message: Statement;
-                        let mut res_select_message: Vec<mysql::Row> = Vec::new();
+                                let mut req_select_message: Statement;
+                                let mut res_select_message: Vec<mysql::Row> = Vec::new();
 
-                        // SQL Request
-                        req_select_message = conn.prep("SELECT * FROM message m LEFT JOIN user u ON m.id_user = u.id WHERE u.token = :u_token AND m.id_channel = :c_id ORDER BY m.id")?;
+                                // SQL Request
+                                req_select_message = conn.prep("SELECT * FROM message m LEFT JOIN user u ON m.id_user = u.id WHERE u.token = :u_token AND m.id_channel = :c_id ORDER BY m.id")?;
 
-                        // Response
-                        res_select_message = conn.exec(
-                            &req_select_message,
-                            params! {
+                                // Response
+                                res_select_message = conn.exec(
+                                    &req_select_message,
+                                    params! {
                             "u_token" => message_given_token,
                             "c_id" => message_given_channel_id,
                         },
-                        )?;
+                                )?;
 
-                        //DEBUG
-                        println!("res_select_message: {:?}", res_select_message);
+                                //DEBUG
+                                println!("res_select_message: {:?}", res_select_message);
 
-                        // Parsing response
-                        let mut messages: Vec<_> = Vec::new();
+                                // Parsing response
+                                let mut messages: Vec<_> = Vec::new();
 
-                        for mut row in res_select_message {
-                            // Getting channel from db
-                            println!("value of res_select_message: {:?}", row);
+                                for mut row in res_select_message {
+                                    // Getting channel from db
+                                    println!("value of res_select_message: {:?}", row);
 
-                            let message = Message {
-                                content: row.take("content").unwrap(),
-                                date: row.take("date").unwrap()
-                            };
+                                    let message = Message {
+                                        content: row.take("content").unwrap(),
+                                        date: row.take("date").unwrap()
+                                    };
 
-                            messages.push(message);
+                                    messages.push(message);
+                                }
+
+                                let messages_serialized = serde_json::to_string(&messages).unwrap();
+                                println!("Serialized messages: {}", messages_serialized);
+                                println!("{:#?}", messages);
+
+                                return_data_json.insert("messages", messages_serialized);
+                            },
+                            "set" => {
+
+                            },
+                            _ => logger.log("Message action does not exist".to_string(), LogLevel::ERROR)
                         }
-
-                        let messages_serialized = serde_json::to_string(&messages).unwrap();
-                        println!("Serialized messages: {}", messages_serialized);
-                        println!("{:#?}", messages);
-
-                        return_data_json.insert("messages", messages_serialized);
                     },
-                    "set" => {
-
-                    },
-                    _ => logger.log("Message action does not exist".to_string(), LogLevel::ERROR)
+                    _ => ()
                 }
 
                 tx.send(return_data_json).unwrap();
