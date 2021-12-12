@@ -18,8 +18,7 @@ fn main() {
     let mut answer = String::from("1");
     env::set_var("PATH_LOGGER", config.logs_directory.clone());
 
-    let mut logger = log::get_logger();
-    logger.log("Ruslychat started!".to_string(), log::LogLevel::INFO);
+    log::get_logger().log("Ruslychat started!".to_string(), log::LogLevel::INFO);
 
     while answer.eq("0") == false {
         std::process::Command::new("clear").status().unwrap();

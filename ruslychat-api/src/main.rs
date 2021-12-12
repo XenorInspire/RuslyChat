@@ -43,14 +43,9 @@ struct Channel {
 async fn main() {
     {
         let config = init::check_init_file();
+        env::set_var("PATH_LOGGER_API", config.logs_directory.clone());
 
-        let mut logger = Logger {
-            path: config.logs_directory,
-            log_file: "".to_string(),
-            max_size: 10
-        };
-
-        logger.log("API starting...".to_string(), LogLevel::INFO);
+        log::get_logger().log("Ruslychat API started!".to_string(), log::LogLevel::INFO);
     }
     // URI POST: /api/login
     // with json data : { "login":"pseudo", "password":"password" }
@@ -69,12 +64,6 @@ async fn main() {
             let thread = thread::spawn(move || -> Result<()> {
                 let config = init::check_init_file();
 
-                let mut logger = Logger {
-                    path: config.logs_directory,
-                    log_file: "".to_string(),
-                    max_size: 10
-                };
-
                 let mut user_given_id = String::new();
                 match user_data.get("login") {
                     Some(value) => user_given_id = value.to_string(),
@@ -82,9 +71,8 @@ async fn main() {
                 }
 
                 //DEBUG
-                logger.log(format!("given login: {}", user_given_id), LogLevel::DEBUG);
+                log::get_logger().log(format!("given login: {}", user_given_id), LogLevel::DEBUG);
                 //println!("given login: {}", user_given_id);
-
 
                 // Database connection
                 let url: String = "mysql://".to_owned() + &*config.user + ":" + &*config.passwd + "@localhost:3306/" + &*config.database;
@@ -105,7 +93,7 @@ async fn main() {
                 )?;
 
                 //DEBUG
-                logger.log(format!("res_select_user: {:?}", res_select_user), LogLevel::DEBUG);
+                log::get_logger().log(format!("res_select_user: {:?}", res_select_user), LogLevel::DEBUG);
 
                 // Parsing response
                 let mut hash_from_db = String::new();
@@ -189,12 +177,6 @@ async fn main() {
             let thread = thread::spawn(move || -> Result<()> {
                 let config = init::check_init_file();
 
-                let mut logger = Logger {
-                    path: config.logs_directory,
-                    log_file: "".to_string(),
-                    max_size: 10
-                };
-
                 let mut channel_given_id = String::new();
                 match channel_data.get("id") {
                     Some(value) => channel_given_id = value.to_string(),
@@ -202,7 +184,7 @@ async fn main() {
                 }
 
                 //DEBUG
-                logger.log(format!("Given id: {}", channel_given_id), LogLevel::DEBUG);
+                log::get_logger().log(format!("Given id: {}", channel_given_id), LogLevel::DEBUG);
 
                 // Database connection
                 let url: String = "mysql://".to_owned() + &*config.user + ":" + &*config.passwd + "@localhost:3306/" + &*config.database;
@@ -290,7 +272,7 @@ async fn main() {
 
                         return_data_json.insert("channels", channels_serialized);
                     },
-                    _ => logger.log("Channel action does not exist".to_string(), LogLevel::ERROR)
+                    _ => log::get_logger().log("Channel action does not exist".to_string(), LogLevel::ERROR)
                 }
 
                 tx.send(return_data_json).unwrap();

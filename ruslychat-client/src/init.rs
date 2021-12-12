@@ -6,6 +6,7 @@ use std::io;
 use std::path::Path;
 use std::process;
 use std::{thread, time};
+use std::env;
 
 // Global variables
 const NEW_CONFIG_FILE_MODE: u8 = 0;
@@ -196,6 +197,7 @@ pub fn change_config_values(mut temp_config: Config) -> Config {
                 let temp = change_logs_directory();
                 if temp != String::from("q") {
                     temp_config.logs_directory = temp;
+                    env::set_var("PATH_LOGGER", temp_config.logs_directory.clone());
                 }
             }
             _ => (),

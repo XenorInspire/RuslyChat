@@ -4,6 +4,9 @@ use std::fs::OpenOptions;
 use std::io::Write;
 use chrono::{DateTime, Utc};
 
+// Static variables
+pub static SIZE_LOG_FILE: u8 = 50;
+
 pub enum LogLevel {
     FATAL,
     ERROR,
@@ -15,7 +18,19 @@ pub enum LogLevel {
 pub struct Logger {
     pub path: String,
     pub log_file: String,
-    pub max_size: u16
+}
+
+pub fn get_logger() -> Logger {
+    let path_logger;
+    match env::var("PATH_LOGGER_API") {
+        Ok(val) => path_logger = val,
+        Err(_e) => path_logger = "logs".to_string(),
+    }
+
+    Logger {
+        path: path_logger.clone(),
+        log_file: String::from(""),
+    }
 }
 
 impl Logger {
