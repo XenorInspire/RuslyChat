@@ -1,4 +1,5 @@
 extern crate chrono;
+extern crate rpassword;
 extern crate serde_derive;
 extern crate serde;
 extern crate serde_json;
@@ -42,7 +43,9 @@ fn main() {
                     backup = config.clone();
                 }
             },
-            _ => (),
+            _ => {
+                std::process::Command::new("clear").status().unwrap();
+            },
         }
     }
 }

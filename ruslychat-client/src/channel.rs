@@ -51,6 +51,8 @@ pub fn display_main_menu(api_host: String, api_port: String) -> u32 {
         }
     }
 
+    std::process::Command::new("clear").status().unwrap();
+
     0
 }
 
