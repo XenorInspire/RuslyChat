@@ -382,7 +382,7 @@ async fn main() {
                                 let mut res_select_message: Vec<mysql::Row> = Vec::new();
 
                                 // SQL Request
-                                req_select_message = conn.prep("SELECT * FROM message m LEFT JOIN user u ON m.id_user = u.id WHERE u.token = :u_token AND m.id_channel = :c_id ORDER BY m.id")?;
+                                req_select_message = conn.prep("SELECT * FROM message m LEFT JOIN user u ON m.id_user = u.id WHERE u.token = :u_token AND m.id_channel = :c_id ORDER BY m.id DESC LIMIT :count")?;
 
                                 // Response
                                 res_select_message = conn.exec(
@@ -390,6 +390,7 @@ async fn main() {
                                     params! {
                                         "u_token" => message_given_token,
                                         "c_id" => message_given_channel_id,
+                                        "count" => message_given_count,
                                     },
                                 )?;
 
@@ -411,6 +412,7 @@ async fn main() {
                                     messages.push(message);
                                 }
 
+                                messages.reverse();
                                 let messages_serialized = serde_json::to_string(&messages).unwrap();
                                 println!("Serialized messages: {}", messages_serialized);
                                 println!("{:#?}", messages);

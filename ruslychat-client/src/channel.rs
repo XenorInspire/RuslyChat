@@ -115,7 +115,7 @@ fn display_channel(id: String, name: String, description: String, api_host: Stri
     post_data.insert("token", env::var("token").unwrap());
     post_data.insert("action", String::from("get"));
     post_data.insert("id", id);
-    post_data.insert("count", String::from("10"));
+    post_data.insert("count", String::from("20"));
 
     //TODO add status if I can not hit URL
     let client = reqwest::blocking::Client::new();
@@ -138,9 +138,11 @@ fn display_channel(id: String, name: String, description: String, api_host: Stri
     std::process::Command::new("clear").status().unwrap();
 
     println!("========================");
-    println!("NAME:\n{}\nDESCRIPTION:\n{}", name, description);
+    println!("NAME:\n{}", name);
+    println!("           =-=          ");
+    println!("DESCRIPTION:\n{}", description);
     println!("========================");
-    println!("Press any key to load previous messages.");
+    println!("Press enter to load previous messages.");
     println!("/help to get available commands");
 
     io::stdin()
