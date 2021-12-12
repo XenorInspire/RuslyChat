@@ -2,19 +2,19 @@
 *.env
 ruslychat-client/target
 ruslychat-server/target
-ruslychat-client/output/debug/ruslychat-client.d
-ruslychat-client/output/debug/.fingerprint
-ruslychat-client/output/debug/build
-ruslychat-client/output/debug/examples
-ruslychat-client/output/debug/deps
-ruslychat-client/output/debug/incremental
-ruslychat-client/output/debug/.cargo-lock
-ruslychat-client/output/CACHEDIR.TAG
-ruslychat-client/output/.rustc_info.json
-ruslychat-client/output/debug/ruslychat-client
-ruslychat-client/output/rls/
-ruslychat-client/Cargo.lock
+ruslychat-api/target
 
+ruslychat-client/output/
 ruslychat-server/output/
+ruslychat-api/output/
 
+ruslychat-client/Cargo.lock
 ruslychat-server/Cargo.lock
+ruslychat-api/Cargo.lock
+
+ruslychat-client/logs/
+ruslychat-server/logs/
+ruslychat-api/logs/
+
+ruslychat-client/config/
+ruslychat-server/config/

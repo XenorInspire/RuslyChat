@@ -6,6 +6,7 @@ use std::io;
 use std::path::Path;
 use std::process;
 use std::{thread, time};
+use std::env;
 
 // Global variables
 const NEW_CONFIG_FILE_MODE: u8 = 0;
@@ -146,6 +147,8 @@ pub fn change_config_values(mut temp_config: Config) -> Config {
     let mut answer = String::from("1");
 
     while answer.eq("0") == false {
+        std::process::Command::new("clear").status().unwrap();
+
         display_settings_menu(&temp_config);
 
         println!("Select setting to change value");
@@ -177,6 +180,7 @@ pub fn change_config_values(mut temp_config: Config) -> Config {
                 let temp = change_logs_directory();
                 if temp != String::from("q") {
                     temp_config.logs_directory = temp;
+                    env::set_var("PATH_LOGGER", temp_config.logs_directory.clone());
                 }
             }
             _ => (),
@@ -188,6 +192,8 @@ pub fn change_config_values(mut temp_config: Config) -> Config {
 
 // Kind of obvious...
 fn display_settings_menu(config: &Config) {
+    std::process::Command::new("clear").status().unwrap();
+
     println!("========================\n        Settings         \n========================");
     println!("Domain => {}", config.domain);
     println!("Destination port => {}", config.port_dest);
@@ -199,6 +205,8 @@ fn change_domain() -> String {
     let mut buff = String::new();
 
     while check_domain(buff.clone()) == false && buff != String::from("q") {
+        std::process::Command::new("clear").status().unwrap();
+
         buff = String::from("");
         println!("Enter a valid domain (or IP address)");
         println!("Press q to cancel");
@@ -216,6 +224,8 @@ fn change_destination_port() -> u16 {
     let mut buff = String::from("");
 
     while check_destinaton_port(buff.clone()) == false {
+        std::process::Command::new("clear").status().unwrap();
+
         println!("Enter a valid destination port");
         println!("Press q to cancel");
         buff = String::from("");
