@@ -3,6 +3,7 @@ extern crate serde_derive;
 extern crate serde;
 extern crate serde_json;
 
+use std::env;
 use std::io;
 
 mod init;
@@ -14,13 +15,14 @@ mod log;
 fn main() {
     let mut config = init::check_init_file();
     let mut backup = config.clone();
-    unsafe {log::PATH_LOGGER = config.logs_directory.clone();}
-
     let mut answer = String::from("1");
+    env::set_var("PATH_LOGGER", config.logs_directory.clone());
 
-    std::process::Command::new("clear").status().unwrap();
+    let mut logger = log::get_logger();
+    logger.log("Ruslychat started!".to_string(), log::LogLevel::INFO);
 
     while answer.eq("0") == false {
+        std::process::Command::new("clear").status().unwrap();
         println!("========================\n Welcome to RuslyChat !\n========================");
         println!("1 : Log in");
         println!("2 : Manage settings");
