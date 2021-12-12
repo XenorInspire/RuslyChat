@@ -1,8 +1,11 @@
 use std::path::Path;
-use std::fs;
+use std::{fs, env};
 use std::fs::OpenOptions;
 use std::io::Write;
 use chrono::{DateTime, Utc};
+
+// Static variables
+pub static SIZE_LOG_FILE: u8 = 50;
 
 pub enum LogLevel {
     FATAL,
@@ -15,7 +18,19 @@ pub enum LogLevel {
 pub struct Logger {
     pub path: String,
     pub log_file: String,
-    pub max_size: u16
+}
+
+pub fn get_logger() -> Logger {
+    let path_logger;
+    match env::var("PATH_LOGGER_API") {
+        Ok(val) => path_logger = val,
+        Err(_e) => path_logger = "logs".to_string(),
+    }
+
+    Logger {
+        path: path_logger.clone(),
+        log_file: String::from(""),
+    }
 }
 
 impl Logger {
@@ -23,6 +38,7 @@ impl Logger {
         if check_log_directory(self.path.clone()) {
             if self.log_file == "" {
                 self.log_file = get_log_file_name(self.path.clone());
+                env::set_var("LOG_FILE", self.log_file.clone());
             }
 
             let mut file = OpenOptions::new()
@@ -43,6 +59,8 @@ impl Logger {
             }
 
             to_log += &*(get_log_time() + " : " + &*message);
+
+            println!("{}", to_log);
 
             match file.write_all(to_log.as_bytes()) {
                 Err(e) => {
