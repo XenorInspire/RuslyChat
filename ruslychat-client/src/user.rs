@@ -1,6 +1,7 @@
 use crate::channel;
 use crate::init;
 
+use rpassword::read_password;
 use std::io;
 use std::env;
 use std::collections::HashMap;
@@ -11,23 +12,21 @@ pub fn request_login(config: Config) {
     let mut password = String::from("0");
 
     while login.eq("0") || password.eq("0") {
-        let mut buff = String::new();
+        let mut buff_login = String::new();
+        let mut buff_password = String::new();
 
         std::process::Command::new("clear").status().unwrap();
 
         println!("Login:");
 
         io::stdin()
-            .read_line(&mut buff)
+            .read_line(&mut buff_login)
             .expect("Reading from stdin failed");
-        login = buff.trim().to_string();
+        login = buff_login.trim().to_string();
 
         println!("Password:");
 
-        io::stdin()
-            .read_line(&mut buff)
-            .expect("Reading from stdin failed");
-        password = buff.trim().to_string();
+        password = read_password().unwrap();
     }
 
     //TODO change api_port to config when available

@@ -1,4 +1,5 @@
 extern crate chrono;
+extern crate rpassword;
 extern crate serde_derive;
 extern crate serde;
 extern crate serde_json;
@@ -11,6 +12,7 @@ mod connect_tcp;
 mod channel;
 mod user;
 mod log;
+mod message;
 
 fn main() {
     let mut config = init::check_init_file();
@@ -44,7 +46,9 @@ fn main() {
                     backup = config.clone();
                 }
             },
-            _ => (),
+            _ => {
+                std::process::Command::new("clear").status().unwrap();
+            },
         }
     }
 }

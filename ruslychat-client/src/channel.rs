@@ -1,3 +1,4 @@
+use crate::message::Message;
 use serde::Deserialize;
 use std::io;
 use std::collections::HashMap;
@@ -50,6 +51,8 @@ pub fn display_main_menu(api_host: String, api_port: String) -> u32 {
         }
     }
 
+    std::process::Command::new("clear").status().unwrap();
+
     0
 }
 
@@ -97,18 +100,64 @@ fn display_channel_menu(api_host: String, api_port: String) -> Result<(), Box<dy
 
         for channel in &channels {
             if channel.id.to_string() == answer.to_string() {
-                println!("{} {} {}", channel.id, channel.name, channel.description);
+                display_channel(channel.id.to_string(), channel.name.clone(), channel.description.clone(), api_host.clone(), api_port.clone());
             }
         }
-        //channels.iter().map(|channel| println!("{} {} {}", channel.id, channel.name, channel.description));
-        //channels.into_iter().filter(|channel| channel.id == 20);
-        /*for channel in channels.borrow() {
-            //println!("{} {}", channel.id, channel.name);
+    }
 
-            if channel.id.to_string() == answer.to_string() {
-                println!("{} {} {}", channel.id, channel.name, channel.description);
-            }
-        }*/
+    Ok(())
+}
+
+fn display_channel(id: String, name: String, description: String, api_host: String, api_port: String) -> Result<(), Box<dyn std::error::Error>> {
+    let mut answer = String::from("1");
+    let mut post_data = HashMap::new();
+
+    post_data.insert("token", env::var("token").unwrap());
+    post_data.insert("action", String::from("get"));
+    post_data.insert("id", id);
+    post_data.insert("count", String::from("20"));
+
+    //TODO add status if I can not hit URL
+    let client = reqwest::blocking::Client::new();
+    let res = client.post("http://".to_owned() + &*api_host + ":" + &*api_port + "/api/message")
+        .json(&post_data)
+        .send()?
+        .json::<HashMap<String, String>>()?;
+
+    let mut messages: Vec<Message> = Vec::new();
+
+    match res.get("messages") {
+        Some(m) => {
+            messages = serde_json::from_str(m).unwrap();
+        },
+        _ => ()
+    }
+
+    let mut buff = String::new();
+
+    std::process::Command::new("clear").status().unwrap();
+
+    println!("========================");
+    println!("NAME:\n{}", name);
+    println!("           =-=          ");
+    println!("DESCRIPTION:\n{}", description);
+    println!("========================");
+    println!("Press enter to load previous messages.");
+    println!("/help to get available commands");
+
+    io::stdin()
+        .read_line(&mut buff)
+        .expect("Reading from stdin failed");
+
+    for message in &messages {
+        println!("[{}] : {}", message.date, message.content);
+    }
+
+    while answer.ne("/quit") {
+        io::stdin()
+            .read_line(&mut buff)
+            .expect("Reading from stdin failed");
+        answer = buff.trim().to_string();
     }
 
     Ok(())
