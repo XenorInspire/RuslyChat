@@ -190,14 +190,6 @@ async fn main() {
             let _thread = thread::spawn(move || -> Result<()> {
                 let config = init::check_init_file();
 
-                let mut channel_given_id = String::new();
-                match channel_data.get("id") {
-                    Some(value) => channel_given_id = value.to_string(),
-                    None => (),
-                }
-
-                get_logger().log(format!("Given id: {}", channel_given_id), LogLevel::DEBUG);
-
                 // Database connection
                 let url: String = "mysql://".to_owned() + &*config.user + ":" + &*config.passwd + "@localhost:3306/" + &*config.database;
                 let opts: Opts = Opts::from_url(&*url)?;
@@ -426,7 +418,7 @@ async fn main() {
 
     // URI POST: /api/message
     // with json data : { "token":"u_token", "action":"get", "id":"c_id", "count":"m_count" }
-    // with json data : { "token":"u_token", "date":"m_date", "action":"set", "id":"c_id", "content":"m_content", "date":"m_date" }
+    // with json data : { "token":"u_token", "action":"set", "id":"c_id", "content":"m_content", "date":"m_date" }
     // To get messages
     let message = warp::path!("message")
         .and(warp::post())
@@ -441,14 +433,6 @@ async fn main() {
             // Thread
             let _thread = thread::spawn(move || -> Result<()> {
                 let config = init::check_init_file();
-
-                let mut message_given_count = String::new();
-                match message_data.get("count") {
-                    Some(value) => message_given_count = value.to_string(),
-                    None => (),
-                }
-
-                get_logger().log(format!("Given count: {}", message_given_count), LogLevel::DEBUG);
 
                 // Database connection
                 let url: String = "mysql://".to_owned() + &*config.user + ":" + &*config.passwd + "@localhost:3306/" + &*config.database;
