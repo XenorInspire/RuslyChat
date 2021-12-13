@@ -67,6 +67,8 @@ fn api_login(api_host: String, api_port: String, login: String, password: String
 
         env::set_var("token", token);
 
+        std::process::Command::new("clear").status().unwrap();
+
         channel::display_main_menu(api_host, api_port);
     } else {
         std::process::Command::new("clear").status().unwrap();
