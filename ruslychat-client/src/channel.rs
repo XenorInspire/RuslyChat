@@ -51,7 +51,7 @@ fn display_channel_menu(api_host: String, api_port: String) -> u8 {
     let mut answer = String::from("1");
     let mut post_data = HashMap::new();
 
-    post_data.insert("token", env::var("token").unwrap());
+    post_data.insert("token", env::var("TOKEN").unwrap());
     post_data.insert("action", String::from("get"));
     post_data.insert("id", String::from("all"));
 
@@ -123,10 +123,11 @@ fn display_channel(
 ) -> u8 {
     let mut post_data = HashMap::new();
 
-    post_data.insert("token", env::var("token").unwrap());
+    post_data.insert("token", env::var("TOKEN").unwrap());
     post_data.insert("action", String::from("get"));
-    post_data.insert("id", id);
+    post_data.insert("channel_id", id.clone());
     post_data.insert("count", String::from("20"));
+    post_data.insert("min_message_id", String::from("0"));
 
     //TODO add status if I can not hit URL
     let client = reqwest::blocking::Client::new();
@@ -147,6 +148,7 @@ fn display_channel(
     };
 
     let mut messages: Vec<message::Message> = Vec::new();
+    let mut last_message_id: u32 = 0;
 
     match res.get("messages") {
         Some(m) => messages = serde_json::from_str(m).unwrap(),
@@ -170,10 +172,11 @@ fn display_channel(
         .expect("Reading from stdin failed");
 
     for message in &messages {
+        last_message_id = message.id;
         println!("[{}] : {}", message.date, message.content);
     }
 
-    message::chat(api_host, api_port);
+    message::chat(last_message_id, id, api_host, api_port);
 
     return 0;
 }
@@ -209,7 +212,7 @@ fn create_channel_menu(api_host: String, api_port: String) {
 fn create_channel(name: String, description: String, api_host: String, api_port: String) -> u8 {
     let mut post_data = HashMap::new();
 
-    post_data.insert("token", env::var("token").unwrap());
+    post_data.insert("token", env::var("TOKEN").unwrap());
     post_data.insert("action", String::from("set"));
     post_data.insert("name", name);
     post_data.insert("description", description);

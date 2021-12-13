@@ -101,11 +101,11 @@ fn api_login(api_host: String, api_port: String, login: String, password: String
         }
 
         // println!("token: {:?}", token.clone());
-        env::set_var("token", token);
+        env::set_var("TOKEN", token);
         std::process::Command::new("clear").status().unwrap();
         return 0;
     } else {
-        std::process::Command::new("clear").status().unwrap();
+        //std::process::Command::new("clear").status().unwrap();
         return 1;
     }
 }

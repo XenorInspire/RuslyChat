@@ -1,11 +1,12 @@
 extern crate chrono;
+extern crate gloo_timers;
 extern crate rpassword;
 extern crate serde;
 extern crate serde_derive;
 extern crate serde_json;
+extern crate rsa;
+extern crate rand;
 
-use rand::rngs::OsRng;
-use rsa::{PaddingScheme, PublicKey, RsaPrivateKey, RsaPublicKey};
 use std::env;
 use std::io;
 
@@ -40,13 +41,7 @@ fn main() {
             "1" => {
                 login::request_login(config.clone());
             }
-            // "1" => {
-            //     let mut rng = OsRng;
-            //     let priv_key =
-            //         RsaPrivateKey::new(&mut rng, 2048).expect("failed to generate a key");
-            //     let pub_key = RsaPublicKey::from(&priv_key);
-            //     connect_tcp::start_connection(config.clone(), priv_key, pub_key);
-            // }
+
             "2" => {
                 config = init::change_config_values(config);
                 if config != backup {

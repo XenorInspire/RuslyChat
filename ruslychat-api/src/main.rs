@@ -6,11 +6,16 @@ extern crate serde;
 extern crate serde_derive;
 extern crate serde_json;
 extern crate warp;
+extern crate ini;
 
 // mod api;
 mod init;
 mod log;
+mod encrypt;
 
+use ini::Ini;
+use rand::rngs::OsRng;
+use rsa::{pkcs1::FromRsaPublicKey, PaddingScheme, PublicKey, RsaPrivateKey, RsaPublicKey, pkcs1::ToRsaPublicKey, pkcs1::ToRsaPrivateKey, pkcs1::FromRsaPrivateKey};
 use log::{get_logger, LogLevel};
 use mysql::prelude::*;
 use mysql::*;
@@ -18,9 +23,6 @@ use pwhash::sha512_crypt;
 use serde::Serialize;
 use std::collections::HashMap;
 //use std::convert::Infallible;
-//use std::fmt;
-//use std::fs;
-//use std::process;
 use std::sync::mpsc;
 use std::thread;
 //use std::time::Duration;
@@ -46,16 +48,28 @@ struct Message {
 
 #[tokio::main]
 async fn main() {
-    {
-        let config = init::check_init_file();
-        env::set_var("PATH_LOGGER_API", config.logs_directory.clone());
+    let config = init::check_init_file();
+    env::set_var("PATH_LOGGER_API", config.logs_directory.clone());
+    get_logger().log("Ruslychat API is starting...".to_string(), LogLevel::INFO);
 
-        get_logger().log("Ruslychat API started!".to_string(), LogLevel::INFO);
-        // get_logger().log("_FATAL_".to_string(), LogLevel::FATAL);
-        // get_logger().log("_ERROR_".to_string(), LogLevel::ERROR);
-        // get_logger().log("_TRACE_".to_string(), LogLevel::TRACE);
-        // get_logger().log("_DEBUG_".to_string(), LogLevel::DEBUG);
-    }
+    let mut rng = OsRng;
+    let priv_key = RsaPrivateKey::new(&mut rng, 2048).expect("failed to generate a key");
+    let pub_key = RsaPublicKey::from(&priv_key);
+    
+    let public_key_string = format!("{:?}", ToRsaPublicKey::to_pkcs1_pem(&pub_key).unwrap());
+    let private_key_string = format!("{:?}", ToRsaPrivateKey::to_pkcs1_pem(&priv_key).unwrap());
+    
+    let mut conf = Ini::new();
+    conf.with_section(Some("KEYS"))
+        .set("private_key", private_key_string)
+        .set("public_key", public_key_string);
+    conf.write_to_file("keys.ini").unwrap();
+
+    /*let mut rng = OsRng;
+    let priv_key = RsaPrivateKey::new(&mut rng, 2048).expect("failed to generate a key");
+    let pub_key = RsaPublicKey::from(&priv_key);*/
+    get_logger().log("Ruslychat API started!".to_string(), LogLevel::INFO);
+    
     // URI POST: /api/login
     // with json data : { "login":"pseudo", "password":"password" }
     // For first login and generating the token
@@ -418,7 +432,7 @@ async fn main() {
         });
 
     // URI POST: /api/message
-    // with json data : { "token":"u_token", "action":"get", "id":"c_id", "count":"m_count"; "min_m_id":"m_id" }
+    // with json data : { "token":"u_token", "action":"get", "channel_id":"c_id", "count":"m_count"; "min_message_id":"m_id" }
     // with json data : { "token":"u_token", "action":"set", "id":"c_id", "content":"m_content", "date":"m_date" }
     // To get messages
     let message = warp::path!("message")
@@ -456,7 +470,7 @@ async fn main() {
                                 }
                                 get_logger().log(format!("Given token: {}", message_given_token), LogLevel::DEBUG);
 
-                                match message_data.get("id") {
+                                match message_data.get("channel_id") {
                                     Some(value) => message_given_channel_id = value.to_string(),
                                     None => (),
                                 }
@@ -468,8 +482,8 @@ async fn main() {
                                 }
                                 get_logger().log(format!("Given count: {}", message_given_count), LogLevel::DEBUG);
 
-                                match message_data.get("m_id") {
-                                    Some(value) => message_given_count = value.to_string(),
+                                match message_data.get("min_message_id") {
+                                    Some(value) => message_given_message_id = value.to_string(),
                                     None => (),
                                 }
                                 get_logger().log(format!("Given message id: {}", message_given_message_id), LogLevel::DEBUG);
@@ -497,8 +511,9 @@ async fn main() {
                                 let mut messages: Vec<_> = Vec::new();
 
                                 for mut row in res_select_message {
-                                    // Getting channel from db
+                                    // Getting messages from db
                                     let message = Message {
+                                        id: row.take("id").unwrap(),
                                         content: row.take("content").unwrap(),
                                         date: row.take("date").unwrap()
                                     };
@@ -535,16 +550,30 @@ async fn main() {
                                     Some(value) => message_given_content = value.to_string(),
                                     None => (),
                                 }
-                                get_logger().log(format!("Message sent in channel id: {}", message_given_channel_id), LogLevel::DEBUG);
+                                get_logger().log(format!("Given message content: {}", message_given_content), LogLevel::DEBUG);
 
                                 match message_data.get("date") {
                                     Some(value) => message_given_date = value.to_string(),
                                     None => (),
                                 }
-                                get_logger().log(format!("Message sent in at: {}", message_given_date), LogLevel::DEBUG);
+                                get_logger().log(format!("Given message date: {}", message_given_date), LogLevel::DEBUG);
                                 
                                 let req_select_message: Statement;
                                 let mut res_select_message: Vec<mysql::Row> = Vec::new();
+
+                                let conf = Ini::load_from_file("keys.ini").unwrap();
+                                let keys_section = conf.section(Some("KEYS")).unwrap();
+                                let private_key = keys_section.get("private_key").unwrap();
+                                let public_key = keys_section.get("public_key").unwrap();
+
+                                //println!("{}", &private_key[10..private_key.len() - 1]);
+                                //println!("{}", public_key);
+                                println!("{}", private_key);
+                                println!("{}", public_key);
+
+                                let message_encrypted: Vec<u8> = serde_json::from_str(&message_given_content).unwrap();
+                                message_given_content = encrypt::decrypt_message(message_encrypted, RsaPrivateKey::from_pkcs1_pem(private_key).unwrap());
+                                // message_given_content = "coucou c mwa".to_string();
 
                                 // SQL Request
                                 req_select_message = conn.prep("INSERT INTO message (content, date, id_user, id_channel) VALUES (:m_content, :m_date, (SELECT id FROM user WHERE token = :u_token), :c_id)")?;
@@ -560,7 +589,7 @@ async fn main() {
                                     },
                                 )?;
 
-                                return_data_json.insert("Message sent","Sucessful".to_string());
+                                return_data_json.insert("message", String::from("OK"));
                             },
                             _ => get_logger().log("Message action does not exist".to_string(), LogLevel::ERROR)
                         }
@@ -588,5 +617,5 @@ async fn main() {
     let routes = warp::path("api").and(routes);
 
     // Bind ip address and port
-    warp::serve(routes).run(([0, 0, 0, 0], 6970)).await;
+    warp::serve(routes).run(([0, 0, 0, 0], 6969)).await;
 }
