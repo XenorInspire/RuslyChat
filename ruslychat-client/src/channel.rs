@@ -1,5 +1,5 @@
 use crate::log;
-use crate::message::Message;
+use crate::message;
 use log::{get_logger, LogLevel};
 use serde::Deserialize;
 use std::collections::HashMap;
@@ -121,7 +121,6 @@ fn display_channel(
     api_host: String,
     api_port: String,
 ) -> u8 {
-    let mut answer = String::from("1");
     let mut post_data = HashMap::new();
 
     post_data.insert("token", env::var("token").unwrap());
@@ -147,7 +146,7 @@ fn display_channel(
         }
     };
 
-    let mut messages: Vec<Message> = Vec::new();
+    let mut messages: Vec<message::Message> = Vec::new();
 
     match res.get("messages") {
         Some(m) => messages = serde_json::from_str(m).unwrap(),
@@ -174,14 +173,7 @@ fn display_channel(
         println!("[{}] : {}", message.date, message.content);
     }
 
-    while answer.ne("/quit") {
-        let mut buff_chat = String::new();
-
-        io::stdin()
-            .read_line(&mut buff_chat)
-            .expect("Reading from stdin failed");
-        answer = buff_chat.trim().to_string();
-    }
+    message::chat(api_host, api_port);
 
     return 0;
 }

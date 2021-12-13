@@ -39,6 +39,7 @@ struct Channel {
 
 #[derive(Serialize, Debug)]
 struct Message {
+    id: u32,
     content: String,
     date: String,
 }
@@ -417,7 +418,7 @@ async fn main() {
         });
 
     // URI POST: /api/message
-    // with json data : { "token":"u_token", "action":"get", "id":"c_id", "count":"m_count" }
+    // with json data : { "token":"u_token", "action":"get", "id":"c_id", "count":"m_count"; "min_m_id":"m_id" }
     // with json data : { "token":"u_token", "action":"set", "id":"c_id", "content":"m_content", "date":"m_date" }
     // To get messages
     let message = warp::path!("message")
@@ -447,6 +448,7 @@ async fn main() {
                                 let mut message_given_token = String::new();
                                 let mut message_given_channel_id = String::new();
                                 let mut message_given_count = String::new();
+                                let mut message_given_message_id = String::new();
 
                                 match message_data.get("token") {
                                     Some(value) => message_given_token = value.to_string(),
@@ -466,11 +468,17 @@ async fn main() {
                                 }
                                 get_logger().log(format!("Given count: {}", message_given_count), LogLevel::DEBUG);
 
+                                match message_data.get("m_id") {
+                                    Some(value) => message_given_count = value.to_string(),
+                                    None => (),
+                                }
+                                get_logger().log(format!("Given message id: {}", message_given_message_id), LogLevel::DEBUG);
+
                                 let req_select_message: Statement;
                                 let mut res_select_message: Vec<mysql::Row> = Vec::new();
 
                                 // SQL Request
-                                req_select_message = conn.prep("SELECT * FROM message m LEFT JOIN user u ON m.id_user = u.id WHERE u.token = :u_token AND m.id_channel = :c_id ORDER BY m.id DESC LIMIT :m_count")?;
+                                req_select_message = conn.prep("SELECT * FROM message m LEFT JOIN user u ON m.id_user = u.id WHERE u.token = :u_token AND m.id_channel = :c_id AND m.id > :m_id ORDER BY m.id DESC LIMIT :m_count")?;
 
                                 // Response
                                 res_select_message = conn.exec(
@@ -479,6 +487,7 @@ async fn main() {
                                         "u_token" => message_given_token,
                                         "c_id" => message_given_channel_id,
                                         "m_count" => message_given_count,
+                                        "m_id" => message_given_message_id
                                     },
                                 )?;
 
