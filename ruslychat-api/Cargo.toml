@@ -9,9 +9,10 @@ edition = "2021"
 mysql = "21.0.2"
 rust-ini = "0.17"
 chrono = "0.4.19"
-rand = "0.8.4"
-rsa= "0.5.0"
 tokio = { version = "*", features = ["full"] }
 warp = "*"
 pwhash ="*"
-# serde_json = "*"
+rand = "0.8.4"
+serde = { version = "*", features = ["derive"] }
+serde_json = "*"
+serde_derive = "*"
