@@ -1,25 +1,25 @@
-use crate::message::Message;
 use crate::log;
+use crate::message::Message;
+use log::{get_logger, LogLevel};
 use serde::Deserialize;
-use std::io;
 use std::collections::HashMap;
 use std::env;
-use log::{LogLevel, get_logger};
+use std::io;
 
 #[derive(Deserialize, Debug)]
 pub struct Channel {
     id: u32,
     name: String,
-    description: String
+    description: String,
 }
 
-pub fn display_main_menu(api_host: String, api_port: String) -> u32 {
+pub fn display_main_menu(api_host: String, api_port: String) {
     let mut answer = String::from("1");
 
     while answer.ne("0") {
         println!("========================\n       Main Menu       \n========================");
-        println!("1 : Open");
-        println!("2 : New");
+        println!("1 : Open a channel");
+        println!("2 : Create a new channel");
         println!("0 : Exit");
 
         let mut buff = String::new();
@@ -30,24 +30,24 @@ pub fn display_main_menu(api_host: String, api_port: String) -> u32 {
 
         match &*answer {
             "1" => {
-                display_channel_menu(api_host.clone(), api_port.clone());
+                if display_channel_menu(api_host.clone(), api_port.clone()) == 1 {
+                    println!("Connection failed! Can't get list of channels");
+                }
                 std::process::Command::new("clear").status().unwrap();
-            },
+            }
             "2" => {
                 create_channel_menu(api_host.clone(), api_port.clone());
-            },
+            }
             _ => {
                 std::process::Command::new("clear").status().unwrap();
-            },
+            }
         }
     }
 
     std::process::Command::new("clear").status().unwrap();
-
-    0
 }
 
-fn display_channel_menu(api_host: String, api_port: String) -> Result<(), Box<dyn std::error::Error>> {
+fn display_channel_menu(api_host: String, api_port: String) -> u8 {
     let mut answer = String::from("1");
     let mut post_data = HashMap::new();
 
@@ -57,16 +57,29 @@ fn display_channel_menu(api_host: String, api_port: String) -> Result<(), Box<dy
 
     //TODO add status if I can not hit URL
     let client = reqwest::blocking::Client::new();
-    let res = client.post("http://".to_owned() + &*api_host + ":" + &*api_port + "/api/channel")
+    let res = client
+        .post("http://".to_owned() + &*api_host + ":" + &*api_port + "/api/channel")
         .json(&post_data)
-        .send()?
-        .json::<HashMap<String, String>>()?;
+        .send()
+        .expect("Connection failed!")
+        .json::<HashMap<String, String>>();
+
+    let res = match res {
+        Ok(hash) => hash,
+        Err(_) => {
+            log::get_logger().log(
+                "Connection failed! Can't get list of channels".to_string(),
+                log::LogLevel::ERROR,
+            );
+            return 1;
+        }
+    };
 
     let mut channels: Vec<Channel> = Vec::new();
 
     match res.get("channels") {
         Some(c) => channels = serde_json::from_str(c).unwrap(),
-        _ => ()
+        _ => (),
     }
 
     while answer.ne("0") {
@@ -87,15 +100,27 @@ fn display_channel_menu(api_host: String, api_port: String) -> Result<(), Box<dy
 
         for channel in &channels {
             if channel.id.to_string() == answer.to_string() {
-                display_channel(channel.id.to_string(), channel.name.clone(), channel.description.clone(), api_host.clone(), api_port.clone());
+                display_channel(
+                    channel.id.to_string(),
+                    channel.name.clone(),
+                    channel.description.clone(),
+                    api_host.clone(),
+                    api_port.clone(),
+                );
             }
         }
     }
 
-    Ok(())
+    return 0;
 }
 
-fn display_channel(id: String, name: String, description: String, api_host: String, api_port: String) -> Result<(), Box<dyn std::error::Error>> {
+fn display_channel(
+    id: String,
+    name: String,
+    description: String,
+    api_host: String,
+    api_port: String,
+) -> u8 {
     let mut answer = String::from("1");
     let mut post_data = HashMap::new();
 
@@ -106,16 +131,27 @@ fn display_channel(id: String, name: String, description: String, api_host: Stri
 
     //TODO add status if I can not hit URL
     let client = reqwest::blocking::Client::new();
-    let res = client.post("http://".to_owned() + &*api_host + ":" + &*api_port + "/api/message")
+    let res = client
+        .post("http://".to_owned() + &*api_host + ":" + &*api_port + "/api/message")
         .json(&post_data)
-        .send()?
-        .json::<HashMap<String, String>>()?;
+        .send()
+        .expect("Connection failed!")
+        .json::<HashMap<String, String>>();
+
+    let res = match res {
+        Ok(hash) => hash,
+        Err(_) => {
+            log::get_logger().log("Connection failed!".to_string(), log::LogLevel::FATAL);
+            println!("Connection failed! Check your internet connection");
+            return 1;
+        }
+    };
 
     let mut messages: Vec<Message> = Vec::new();
 
     match res.get("messages") {
         Some(m) => messages = serde_json::from_str(m).unwrap(),
-        _ => ()
+        _ => (),
     }
 
     let mut buff_enter = String::new();
@@ -128,7 +164,7 @@ fn display_channel(id: String, name: String, description: String, api_host: Stri
     println!("DESCRIPTION:\n{}", description);
     println!("========================");
     println!("Press enter to load previous messages.");
-    println!("/help to get available commands");
+    println!("!help to get available commands");
 
     io::stdin()
         .read_line(&mut buff_enter)
@@ -147,7 +183,7 @@ fn display_channel(id: String, name: String, description: String, api_host: Stri
         answer = buff_chat.trim().to_string();
     }
 
-    Ok(())
+    return 0;
 }
 
 fn create_channel_menu(api_host: String, api_port: String) {
@@ -178,7 +214,7 @@ fn create_channel_menu(api_host: String, api_port: String) {
     create_channel(name, description, api_host, api_port);
 }
 
-fn create_channel(name: String, description: String, api_host: String, api_port: String) -> Result<(), Box<dyn std::error::Error>> {
+fn create_channel(name: String, description: String, api_host: String, api_port: String) -> u8 {
     let mut post_data = HashMap::new();
 
     post_data.insert("token", env::var("token").unwrap());
@@ -188,16 +224,30 @@ fn create_channel(name: String, description: String, api_host: String, api_port:
 
     //TODO add status if I can not hit URL
     let client = reqwest::blocking::Client::new();
-    let res = client.post("http://".to_owned() + &*api_host + ":" + &*api_port + "/api/channel")
+    let res = client
+        .post("http://".to_owned() + &*api_host + ":" + &*api_port + "/api/channel")
         .json(&post_data)
-        .send()?
-        .json::<HashMap<String, String>>()?;
+        .send()
+        .expect("Connection failed!")
+        .json::<HashMap<String, String>>();
+
+    let res = match res {
+        Ok(hash) => hash,
+        Err(_) => {
+            log::get_logger().log(
+                "Connection failed! Can't create a new channel".to_string(),
+                log::LogLevel::FATAL,
+            );
+            println!("Connection failed! Check your internet connection");
+            return 2;
+        }
+    };
 
     let mut channel_creation_status = String::new();
 
     match res.get("channel") {
         Some(m) => channel_creation_status = m.clone(),
-        _ => ()
+        _ => (),
     }
 
     if channel_creation_status.eq("OK") {
@@ -206,7 +256,8 @@ fn create_channel(name: String, description: String, api_host: String, api_port:
     } else {
         std::process::Command::new("clear").status().unwrap();
         get_logger().log("Channel creation error...".to_string(), LogLevel::ERROR);
+        return 1;
     }
 
-    Ok(())
+    return 0;
 }

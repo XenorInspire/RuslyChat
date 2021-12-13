@@ -1,17 +1,17 @@
 extern crate chrono;
 extern crate mysql;
-extern crate rand;
 extern crate pwhash;
-extern crate warp;
-extern crate serde_derive;
+extern crate rand;
 extern crate serde;
+extern crate serde_derive;
 extern crate serde_json;
+extern crate warp;
 
 // mod api;
 mod init;
 mod log;
 
-use log::{LogLevel, get_logger};
+use log::{get_logger, LogLevel};
 use mysql::prelude::*;
 use mysql::*;
 use pwhash::sha512_crypt;
@@ -24,9 +24,9 @@ use std::collections::HashMap;
 use std::sync::mpsc;
 use std::thread;
 //use std::time::Duration;
-use std::env;
-use rand::Rng;
 use rand::distributions::Alphanumeric;
+use rand::Rng;
+use std::env;
 //use warp::http::StatusCode;
 use warp::Filter;
 
@@ -50,10 +50,10 @@ async fn main() {
         env::set_var("PATH_LOGGER_API", config.logs_directory.clone());
 
         get_logger().log("Ruslychat API started!".to_string(), LogLevel::INFO);
-        get_logger().log("_FATAL_".to_string(), LogLevel::FATAL);
-        get_logger().log("_ERROR_".to_string(), LogLevel::ERROR);
-        get_logger().log("_TRACE_".to_string(), LogLevel::TRACE);
-        get_logger().log("_DEBUG_".to_string(), LogLevel::DEBUG);
+        // get_logger().log("_FATAL_".to_string(), LogLevel::FATAL);
+        // get_logger().log("_ERROR_".to_string(), LogLevel::ERROR);
+        // get_logger().log("_TRACE_".to_string(), LogLevel::TRACE);
+        // get_logger().log("_DEBUG_".to_string(), LogLevel::DEBUG);
     }
     // URI POST: /api/login
     // with json data : { "login":"pseudo", "password":"password" }
@@ -81,13 +81,20 @@ async fn main() {
                 get_logger().log(format!("given login: {}", user_given_id), LogLevel::DEBUG);
 
                 // Database connection
-                let url: String = "mysql://".to_owned() + &*config.user + ":" + &*config.passwd + "@localhost:3306/" + &*config.database;
+                let url: String = "mysql://".to_owned()
+                    + &*config.user
+                    + ":"
+                    + &*config.passwd
+                    + "@localhost:3306/"
+                    + &*config.database;
                 let opts: Opts = Opts::from_url(&*url)?;
                 let pool: Pool = Pool::new(opts)?;
                 let mut conn: PooledConn = pool.get_conn()?;
 
                 // SQL Request
-                let req_select_user = conn.prep("SELECT * FROM `user` WHERE `email` = :email OR `username` = :username ")?;
+                let req_select_user = conn.prep(
+                    "SELECT * FROM `user` WHERE `email` = :email OR `username` = :username ",
+                )?;
 
                 // Response
                 let res_select_user: Vec<mysql::Row> = conn.exec(
@@ -98,7 +105,10 @@ async fn main() {
                     },
                 )?;
 
-                get_logger().log(format!("res_select_user: {:?}", res_select_user), LogLevel::DEBUG);
+                get_logger().log(
+                    format!("res_select_user: {:?}", res_select_user),
+                    LogLevel::DEBUG,
+                );
 
                 // Parsing response
                 let mut hash_from_db = String::new();
@@ -132,7 +142,8 @@ async fn main() {
                     get_logger().log(format!("token: {}", token), LogLevel::DEBUG);
 
                     // SQL Request
-                    let req_update_user_token = conn.prep("UPDATE `user` SET `token` = :token WHERE `id` = :id")?;
+                    let req_update_user_token =
+                        conn.prep("UPDATE `user` SET `token` = :token WHERE `id` = :id")?;
 
                     // Response
                     let _res_update_user_token: Vec<mysql::Row> = conn.exec(
@@ -263,7 +274,48 @@ async fn main() {
                                 return_data_json.insert("channels", channels_serialized);
                             },
                             "del" => {
+                                let mut channel_given_id = String::new();
+                                let mut channel_given_token = String::new();
 
+                                match channel_data.get("id") {
+                                    Some(value) => channel_given_id = value.to_string(),
+                                    None => (),
+                                }
+                                get_logger().log(format!("Given id: {}", channel_given_id), LogLevel::DEBUG);
+
+                                match channel_data.get("token") {
+                                    Some(value) => channel_given_token = value.to_string(),
+                                    None => (),
+                                }
+                                get_logger().log(format!("Given token: {}", channel_given_token), LogLevel::DEBUG);
+
+                                let req_delete_user_channel: Statement;
+
+                                // SQL Request, remove users from channel
+                                req_delete_user_channel = conn.prep("DELETE FROM user_channel WHERE id_channel = :c_id")?;
+
+                                // Response
+                                let _res_delete_user_channel: Vec<mysql::Row> = conn.exec(
+                                    &req_delete_user_channel,
+                                    params! {
+                                        "c_id" => channel_given_id.clone(),
+                                    },
+                                )?;
+
+                                let req_delete_channel: Statement;
+
+                                // SQL Request, delete channel
+                                req_delete_channel = conn.prep("DELETE FROM channel WHERE id = :c_id")?;
+
+                                // Response
+                                let _res_delete_channel: Vec<mysql::Row> = conn.exec(
+                                    &req_delete_channel,
+                                    params! {
+                                        "c_id" => channel_given_id,
+                                    },
+                                )?;
+
+                                return_data_json.insert("channel", String::from("OK"));
                             },
                             "set" => {
                                 let mut channel_given_token = String::new();
@@ -374,8 +426,8 @@ async fn main() {
 
     // URI POST: /api/message
     // with json data : { "token":"u_token", "action":"get", "id":"c_id", "count":"m_count" }
-    // with json data : { "token":"u_token", "action":"set", "count":"m_count" }
-    // To get channels
+    // with json data : { "token":"u_token", "date":"m_date", "action":"set", "id":"c_id", "content":"m_content", "date":"m_date" }
+    // To get messages
     let message = warp::path!("message")
         .and(warp::post())
         .and(warp::body::json())
@@ -434,7 +486,7 @@ async fn main() {
                                 let mut res_select_message: Vec<mysql::Row> = Vec::new();
 
                                 // SQL Request
-                                req_select_message = conn.prep("SELECT * FROM message m LEFT JOIN user u ON m.id_user = u.id WHERE u.token = :u_token AND m.id_channel = :c_id ORDER BY m.id DESC LIMIT :count")?;
+                                req_select_message = conn.prep("SELECT * FROM message m LEFT JOIN user u ON m.id_user = u.id WHERE u.token = :u_token AND m.id_channel = :c_id ORDER BY m.id DESC LIMIT :m_count")?;
 
                                 // Response
                                 res_select_message = conn.exec(
@@ -442,7 +494,7 @@ async fn main() {
                                     params! {
                                         "u_token" => message_given_token,
                                         "c_id" => message_given_channel_id,
-                                        "count" => message_given_count,
+                                        "m_count" => message_given_count,
                                     },
                                 )?;
 
@@ -469,7 +521,53 @@ async fn main() {
                                 return_data_json.insert("messages", messages_serialized);
                             },
                             "set" => {
+                                let mut message_given_token = String::new();
+                                let mut message_given_channel_id = String::new();
+                                let mut message_given_content = String::new();
+                                let mut message_given_date = String::new();
 
+                                match message_data.get("token") {
+                                    Some(value) => message_given_token = value.to_string(),
+                                    None => (),
+                                }
+                                get_logger().log(format!("Given token: {}", message_given_token), LogLevel::DEBUG);
+
+                                match message_data.get("id") {
+                                    Some(value) => message_given_channel_id = value.to_string(),
+                                    None => (),
+                                }
+                                get_logger().log(format!("Given channel id: {}", message_given_channel_id), LogLevel::DEBUG);
+                                
+                                match message_data.get("content") {
+                                    Some(value) => message_given_content = value.to_string(),
+                                    None => (),
+                                }
+                                get_logger().log(format!("Message sent in channel id: {}", message_given_channel_id), LogLevel::DEBUG);
+
+                                match message_data.get("date") {
+                                    Some(value) => message_given_date = value.to_string(),
+                                    None => (),
+                                }
+                                get_logger().log(format!("Message sent in at: {}", message_given_date), LogLevel::DEBUG);
+                                
+                                let req_select_message: Statement;
+                                let mut res_select_message: Vec<mysql::Row> = Vec::new();
+
+                                // SQL Request
+                                req_select_message = conn.prep("INSERT INTO message (content, date, id_user, id_channel) VALUES (:m_content, :m_date, (SELECT id FROM user WHERE token = :u_token), :c_id)")?;
+
+                                // Response
+                                res_select_message = conn.exec(
+                                    &req_select_message,
+                                    params! {
+                                        "m_content" => message_given_content,
+                                        "m_date" => message_given_date,
+                                        "u_token" => message_given_token,
+                                        "c_id" => message_given_channel_id,
+                                    },
+                                )?;
+
+                                return_data_json.insert("Message sent","Sucessful".to_string());
                             },
                             _ => get_logger().log("Message action does not exist".to_string(), LogLevel::ERROR)
                         }
