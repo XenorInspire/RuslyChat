@@ -1,15 +1,15 @@
-extern crate gloo_timers;
-
 use crate::log;
 use crate::message;
 use chrono::{DateTime, Utc};
-use gloo_timers::callback::Interval;
 use rand::rngs::OsRng;
 use rsa::{PaddingScheme, PublicKey, RsaPrivateKey, RsaPublicKey};
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::env;
 use std::io;
+use std::sync::mpsc::{self, TryRecvError};
+use std::thread;
+use std::time::Duration;
 
 #[derive(Deserialize, Debug)]
 pub struct Message {
@@ -19,11 +19,41 @@ pub struct Message {
 }
 
 pub fn chat(mut last_message_id: u32, channel_id: String, api_host: String, api_port: String) {
+    let (tx, rx) = mpsc::channel();
+    let channel_id_cpy = channel_id.clone();
+    let api_host_cpy = api_host.clone();
+    let api_port_cpy = api_port.clone();
+
+    let _thread = thread::spawn(move || loop {
+        last_message_id = receive_message(
+            channel_id_cpy.clone(),
+            last_message_id,
+            api_host_cpy.clone(),
+            api_port_cpy.clone(),
+        );
+
+        println!("Working...");
+        thread::sleep(Duration::from_millis(5000));
+
+        match rx.try_recv() {
+            Ok(_) | Err(TryRecvError::Disconnected) => {
+                println!("Terminating.");
+                break;
+            }
+            Err(TryRecvError::Empty) => {}
+        }
+    });
+
+    let mut line = String::new();
+    let stdin = io::stdin();
+    let _ = stdin.read_line(&mut line);
+
+    let _ = tx.send(());
+
     let mut answer: String = String::from("0");
     let mut rng = OsRng;
     let priv_key = RsaPrivateKey::new(&mut rng, 2048).expect("failed to generate a key");
     let pub_key = RsaPublicKey::from(&priv_key);
-
     /*let channel_id_cpy = channel_id.clone();
     let api_host_cpy = api_host.clone();
     let api_port_cpy = api_port.clone();
@@ -178,13 +208,18 @@ fn encrypt_message(
     mut rng: rand::rngs::OsRng,
     pub_key: rsa::RsaPublicKey,
 ) -> std::vec::Vec<u8> {
-    let mut message_encrypted = pub_key.encrypt(
-        &mut rng,
-        PaddingScheme::new_pkcs1v15_encrypt(),
-        &message.as_bytes(),
-    ).expect("failed to encrypt");
+    let mut message_encrypted = pub_key
+        .encrypt(
+            &mut rng,
+            PaddingScheme::new_pkcs1v15_encrypt(),
+            &message.as_bytes(),
+        )
+        .expect("failed to encrypt");
 
-    log::get_logger().log(format!("{:?}", message_encrypted.clone()), log::LogLevel::DEBUG);
+    log::get_logger().log(
+        format!("{:?}", message_encrypted.clone()),
+        log::LogLevel::DEBUG,
+    );
 
     //message_encrypted.retain(|&x| x != 255);
     //message_encrypted = vec![120, 12, 32, 18];

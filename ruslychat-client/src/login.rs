@@ -105,7 +105,7 @@ fn api_login(api_host: String, api_port: String, login: String, password: String
         std::process::Command::new("clear").status().unwrap();
         return 0;
     } else {
-        //std::process::Command::new("clear").status().unwrap();
+        std::process::Command::new("clear").status().unwrap();
         return 1;
     }
 }
