@@ -1,15 +1,17 @@
 extern crate chrono;
+extern crate rand;
 extern crate rpassword;
+extern crate rsa;
 extern crate serde;
 extern crate serde_derive;
 extern crate serde_json;
-extern crate rsa;
-extern crate rand;
 
 use std::env;
 use std::io;
 
 //temp
+use rand::rngs::OsRng;
+use rsa::{PaddingScheme, PublicKey, RsaPrivateKey, RsaPublicKey};
 use std::sync::mpsc::{self, TryRecvError};
 use std::thread;
 use std::time::Duration;
@@ -25,9 +27,15 @@ fn main() {
     let mut backup = config.clone();
     let mut answer = String::from("1");
     env::set_var("PATH_LOGGER", config.logs_directory.clone());
+    log::get_logger().log("Ruslychat is starting".to_string(), log::LogLevel::INFO);
+
+    let mut rng = OsRng;
+    let priv_key = RsaPrivateKey::new(&mut rng, 2048).expect("failed to generate a key");
+    let pub_key = RsaPublicKey::from(&priv_key);
 
     log::get_logger().log("Ruslychat started!".to_string(), log::LogLevel::INFO);
 
+    /*
     //temp
     let (tx, rx) = mpsc::channel();
     let _thread = thread::spawn(move || loop {
@@ -47,6 +55,7 @@ fn main() {
     let _ = stdin.read_line(&mut line);
     let _ = tx.send(());
     //----
+    */
 
     while answer.eq("0") == false {
         std::process::Command::new("clear").status().unwrap();
@@ -63,7 +72,12 @@ fn main() {
 
         match &*answer {
             "1" => {
-                login::request_login(config.clone());
+                if login::request_login(config.clone(), pub_key.clone()) == 0 {
+                    channel::display_main_menu(
+                        config.domain.clone(),
+                        config.port_dest.clone().to_string(),
+                    )
+                }
             }
 
             "2" => {

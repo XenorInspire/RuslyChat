@@ -14,7 +14,7 @@ mod log;
 mod encrypt;
 
 use rand::rngs::OsRng;
-use rsa::{pkcs1::FromRsaPublicKey, PaddingScheme, PublicKey, RsaPrivateKey, RsaPublicKey, pkcs1::ToRsaPublicKey, pkcs1::ToRsaPrivateKey, pkcs1::FromRsaPrivateKey};
+use rsa::{RsaPrivateKey, RsaPublicKey, pkcs1::ToRsaPublicKey, pkcs1::FromRsaPublicKey};
 use log::{get_logger, LogLevel};
 use mysql::prelude::*;
 use mysql::*;
@@ -51,18 +51,24 @@ async fn main() {
     env::set_var("PATH_LOGGER_API", config.logs_directory.clone());
     get_logger().log("Ruslychat API is starting...".to_string(), LogLevel::INFO);
 
+    // For login route
     let mut rng = OsRng;
-    let priv_key = RsaPrivateKey::new(&mut rng, 2048).expect("failed to generate a key");
-    let pub_key = RsaPublicKey::from(&priv_key);
+    let private_key = RsaPrivateKey::new(&mut rng, 2048).expect("failed to generate a key");
+    let public_key = RsaPublicKey::from(&private_key);
 
+    // For message route
     let mut rng2 = rng.clone();
-    let priv_key2 = priv_key.clone();
-    let pub_key2 = pub_key.clone();
+    let private_key2 = private_key.clone();
+    let public_key2 = public_key.clone();
+
+    let mut rng3 = rng.clone();
+    let private_key3 = private_key.clone();
+    let public_key3 = public_key.clone();
 
     get_logger().log("Ruslychat API started!".to_string(), LogLevel::INFO);
     
     // URI POST: /api/login
-    // with json data : { "login":"pseudo", "password":"password", "public_key":"client_pub_key" }
+    // with json data : { "login":"pseudo", "password":"password", "public_key":"client_public_key" }
     // For first login and generating the token
     let user_login = warp::path!("login")
         .and(warp::post())
@@ -70,14 +76,14 @@ async fn main() {
         .map( move |request_data: HashMap<String, String>| {
             let message_data = request_data.clone();
             let mut return_data_json: HashMap<_, String> = HashMap::new();
-            let mut message_given_pub_key = String::new();
+            let mut message_given_public_key = String::new();
 
             // For sending result from thread
             let (tx, rx) = mpsc::channel();
 
             let mut user_rng = rng.clone();
-            let user_priv_key = priv_key.clone();
-            let user_pub_key = pub_key.clone();
+            let user_private_key = private_key.clone();
+            let user_public_key = public_key.clone();
 
             // Checking password in thread
             let _thread = thread::spawn(move || -> Result<()> {
@@ -168,25 +174,25 @@ async fn main() {
 
                     // Insert public key
                     match message_data.get("public_key"){
-                        Some(value) => message_given_pub_key = value.to_string(),
+                        Some(value) => message_given_public_key = value.to_string(),
                         None => (),
                     }
 
-                    if message_given_pub_key.is_empty() {
-                        get_logger().log(format!("Not given pub_key"), LogLevel::DEBUG);
+                    if message_given_public_key.is_empty() {
+                        get_logger().log(format!("Not given public_key"), LogLevel::DEBUG);
                         return_data_json.insert("connection", "Refused".to_string());
                         return_data_json.insert("info", "Missing public key.".to_string());
                         tx.send(return_data_json).unwrap();
  
                     } else {
-                        get_logger().log(format!("Given pub_key: {}", message_given_pub_key), LogLevel::DEBUG);
+                        get_logger().log(format!("Given public_key: {}", message_given_public_key), LogLevel::DEBUG);
                         // SQL Request
-                        let req_update_user_token = conn.prep("UPDATE `user` SET `public_key` = :pub_key WHERE `id` = :id")?;
+                        let req_update_user_token = conn.prep("UPDATE `user` SET `public_key` = :public_key WHERE `id` = :id")?;
 
                         let _res_update_user_token: Vec<mysql::Row> = conn.exec(
                             &req_update_user_token,
                             params! {
-                                "pub_key" => message_given_pub_key,
+                                "public_key" => message_given_public_key,
                                 "id" => id_from_db
                             },
                         )?;
@@ -195,7 +201,7 @@ async fn main() {
                         // Response
                         return_data_json.insert("connection", "Success".to_string());
                         return_data_json.insert("token", token);
-                        return_data_json.insert("pub_key", ToRsaPublicKey::to_pkcs1_pem(&user_pub_key).unwrap());
+                        return_data_json.insert("public_key", ToRsaPublicKey::to_pkcs1_pem(&user_public_key).unwrap());
 
                         println!("{:?}", return_data_json);
 
@@ -475,9 +481,14 @@ async fn main() {
             // For sending result from thread
             let (tx, rx) = mpsc::channel();
 
+            // For message
             let mut message_rng = rng2.clone();
-            let message_priv_key = priv_key2.clone();
-            let message_pub_key = pub_key2.clone();
+            let message_private_key = private_key2.clone();
+            let message_public_key = public_key2.clone();
+
+            let mut message_rng2 = rng3.clone();
+            let message_private_key2 = private_key3.clone();
+            let message_public_key2 = public_key3.clone();
 
             // Thread
             let _thread = thread::spawn(move || -> Result<()> {
@@ -532,7 +543,7 @@ async fn main() {
                                 res_select_message = conn.exec(
                                     &req_select_message,
                                     params! {
-                                        "u_token" => message_given_token,
+                                        "u_token" => &message_given_token,
                                         "c_id" => message_given_channel_id,
                                         "m_count" => message_given_count,
                                         "m_id" => message_given_message_id
@@ -560,7 +571,36 @@ async fn main() {
 
                                 get_logger().log(format!("Serialized messages: {}", messages_serialized), LogLevel::DEBUG);
 
-                                return_data_json.insert("messages", messages_serialized);
+                                // Getting user public key
+                                println!("anthony1");
+
+                                // SQL Request
+                                let req_select_user_public_key: Statement;
+                                let mut res_select_user_public_key: Vec<mysql::Row> = Vec::new();
+                                req_select_user_public_key = conn.prep("SELECT public_key FROM user WHERE token = :u_token")?;
+                                println!("anthony2");
+
+                                // Response
+                                res_select_user_public_key = conn.exec(
+                                    &req_select_user_public_key,
+                                    params! {
+                                        "u_token" => &message_given_token,
+                                    },
+                                )?;
+                                println!("anthony3");
+                                // Parsing result
+                                let mut user_public_key = String::new();
+                                for mut row in res_select_user_public_key {
+                                    user_public_key = row.take("public_key").unwrap();
+                                }
+                                println!("1 {:?}", user_public_key.clone());
+                                // Encrypting
+                                let messages_encrypted = encrypt::encrypt_message(&messages_serialized, message_rng2, RsaPublicKey::from_pkcs1_pem(&user_public_key).unwrap());
+                                println!("2 {:?}", messages_encrypted.clone());
+                                let messages_encrypted_serialized = serde_json::to_string(&messages_encrypted).unwrap();
+                                println!("3 {:?}", messages_encrypted_serialized.clone());
+
+                                return_data_json.insert("messages", messages_encrypted_serialized);
                             },
                             "set" => {
                                 let mut message_given_token = String::new();
@@ -596,7 +636,7 @@ async fn main() {
                                 let mut res_select_message: Vec<mysql::Row> = Vec::new();
 
                                 let message_encrypted: Vec<u8> = serde_json::from_str(&message_given_content).unwrap();
-                                message_given_content = encrypt::decrypt_message(message_encrypted, message_priv_key);
+                                message_given_content = encrypt::decrypt_message(message_encrypted, message_private_key);
                                 // message_given_content = "coucou c mwa".to_string();
 
                                 // SQL Request

@@ -126,7 +126,7 @@ fn display_channel(
     post_data.insert("token", env::var("TOKEN").unwrap());
     post_data.insert("action", String::from("get"));
     post_data.insert("channel_id", id.clone());
-    post_data.insert("count", String::from("20"));
+    post_data.insert("count", String::from("1"));
     post_data.insert("min_message_id", String::from("0"));
 
     //TODO add status if I can not hit URL

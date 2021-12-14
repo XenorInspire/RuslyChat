@@ -18,54 +18,50 @@ pub struct Message {
     pub date: String,
 }
 
-pub fn chat(mut last_message_id: u32, channel_id: String, api_host: String, api_port: String) {
+pub fn chat(last_message_id: u32, channel_id: String, api_host: String, api_port: String) {
     let (tx, rx) = mpsc::channel();
     let channel_id_cpy = channel_id.clone();
     let api_host_cpy = api_host.clone();
     let api_port_cpy = api_port.clone();
 
-    let _thread = thread::spawn(move || loop {
-        last_message_id = receive_message(
-            channel_id_cpy.clone(),
-            last_message_id,
-            api_host_cpy.clone(),
-            api_port_cpy.clone(),
-        );
+    let _thread = thread::spawn(move || {
+        //let channel_id_to_send = channel_id_cpy.clone();
+        let mut last_message_id_to_send = last_message_id.clone();
+        
+        loop {
+            let res = receive_message(
+                channel_id_cpy.clone(),
+                last_message_id_to_send,
+                api_host_cpy.clone(),
+                api_port_cpy.clone(),
+            );
 
-        println!("Working...");
-        thread::sleep(Duration::from_millis(5000));
-
-        match rx.try_recv() {
-            Ok(_) | Err(TryRecvError::Disconnected) => {
-                println!("Terminating.");
-                break;
+            if res > 0 {
+                last_message_id_to_send = res;
             }
-            Err(TryRecvError::Empty) => {}
+
+            thread::sleep(Duration::from_millis(5000));
+
+            match rx.try_recv() {
+                Ok(_) | Err(TryRecvError::Disconnected) => {
+                    println!("Terminating.");
+                    break;
+                }
+                Err(TryRecvError::Empty) => {}
+            }
         }
     });
 
+    /*
     let mut line = String::new();
     let stdin = io::stdin();
     let _ = stdin.read_line(&mut line);
-
-    let _ = tx.send(());
+    */
 
     let mut answer: String = String::from("0");
     let mut rng = OsRng;
     let priv_key = RsaPrivateKey::new(&mut rng, 2048).expect("failed to generate a key");
     let pub_key = RsaPublicKey::from(&priv_key);
-    /*let channel_id_cpy = channel_id.clone();
-    let api_host_cpy = api_host.clone();
-    let api_port_cpy = api_port.clone();
-    let interval = Interval::new(5_000, move || {
-        println!("coucou je suis là et ce n'est pas clément puisqu'il n'est pas dans le groupe");
-        last_message_id = receive_message(
-            channel_id_cpy.clone(),
-            last_message_id,
-            api_host_cpy.clone(),
-            api_port_cpy.clone(),
-        );
-    });*/
 
     while answer.ne("!exit") {
         let mut buff_chat = String::new();
@@ -89,7 +85,7 @@ pub fn chat(mut last_message_id: u32, channel_id: String, api_host: String, api_
         }
     }
 
-    //interval.cancel();
+    let _ = tx.send(());
 }
 
 fn send_message(
@@ -162,7 +158,7 @@ fn receive_message(
 
     post_data.insert("token", env::var("TOKEN").unwrap());
     post_data.insert("action", String::from("get"));
-    post_data.insert("id", channel_id);
+    post_data.insert("channel_id", channel_id);
     post_data.insert("min_message_id", min_message_id.to_string());
     post_data.insert("count", String::from("20"));
 

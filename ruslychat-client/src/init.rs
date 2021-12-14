@@ -13,7 +13,7 @@ const NEW_CONFIG_FILE_MODE: u8 = 0;
 pub const CURRENT_CONFIG_FILE_MODE: u8 = 1;
 
 // Default values
-const CONFIG_FILE: &str = "config/config.ini";
+pub const CONFIG_FILE: &str = "config/config.ini";
 const DEFAULT_LOG_DIRECTORY: &str = "logs";
 const DEFAULT_DESTINATION_PORT: u16 = 6969;
 const DEFAULT_DOMAIN: &str = "127.0.0.1";

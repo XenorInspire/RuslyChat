@@ -23,24 +23,29 @@ pub struct Logger {
 
 pub fn get_logger() -> Logger {
     let path_logger;
+    let log_file;
     match env::var("PATH_LOGGER") {
         Ok(val) => path_logger = val,
         Err(_e) => path_logger = "logs".to_string(),
     }
 
+    match env::var("LOG_FILE") {
+        Ok(val) => log_file = val,
+        Err(_e) => {
+            log_file = get_log_file_name(path_logger.clone());
+            env::set_var("LOG_FILE", log_file.clone());
+        }
+    }
+
     Logger {
         path: path_logger.clone(),
-        log_file: String::from(""),
+        log_file: log_file.clone(),
     }
 }
 
 impl Logger {
     pub fn log(&mut self, message: String, flag: LogLevel) {
         if check_log_directory(self.path.clone()) {
-            if self.log_file == "" {
-                self.log_file = get_log_file_name(self.path.clone());
-            }
-
             let mut file = OpenOptions::new()
                 .write(true)
                 .append(true)
@@ -75,7 +80,6 @@ impl Logger {
 
 fn get_log_time() -> String {
     let now: DateTime<Utc> = Utc::now();
-
     now.format("[%d-%m-%Y %H:%M:%S]").to_string()
 }
 
