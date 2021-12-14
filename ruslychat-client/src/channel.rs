@@ -2,7 +2,7 @@ use crate::log;
 use crate::message;
 use log::{get_logger, LogLevel};
 use rand::rngs::OsRng;
-use rsa::{PaddingScheme, PublicKey, RsaPrivateKey, RsaPublicKey};
+use rsa::RsaPrivateKey;
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::env;
@@ -15,13 +15,8 @@ pub struct Channel {
     description: String,
 }
 
-pub fn display_main_menu(
-    api_host: String,
-    api_port: String,
-    priv_key: RsaPrivateKey,
-    pub_key: RsaPublicKey,
-    rng: OsRng,
-) {
+// Main menu of RuslyChat when you are connected
+pub fn display_main_menu(api_host: String, api_port: String, priv_key: RsaPrivateKey, rng: OsRng) {
     let mut answer = String::from("1");
 
     while answer.ne("0") {
@@ -42,7 +37,6 @@ pub fn display_main_menu(
                     api_host.clone(),
                     api_port.clone(),
                     priv_key.clone(),
-                    pub_key.clone(),
                     rng.clone(),
                 ) == 1
                 {
@@ -62,11 +56,11 @@ pub fn display_main_menu(
     std::process::Command::new("clear").status().unwrap();
 }
 
+// Get the list of all the channels the user has access and display it
 fn display_channel_menu(
     api_host: String,
     api_port: String,
     priv_key: RsaPrivateKey,
-    pub_key: RsaPublicKey,
     rng: OsRng,
 ) -> u8 {
     let mut answer = String::from("1");
@@ -76,14 +70,24 @@ fn display_channel_menu(
     post_data.insert("action", String::from("get"));
     post_data.insert("id", String::from("all"));
 
-    //TODO add status if I can not hit URL
     let client = reqwest::blocking::Client::new();
     let res = client
         .post("http://".to_owned() + &*api_host + ":" + &*api_port + "/api/channel")
         .json(&post_data)
-        .send()
-        .expect("Connection failed!")
-        .json::<HashMap<String, String>>();
+        .send();
+
+    let res = match res {
+        Ok(result) => result,
+        Err(_) => {
+            log::get_logger().log(
+                "The RuslyChat server isn't reachable :(".to_string(),
+                log::LogLevel::ERROR,
+            );
+            return 1;
+        }
+    };
+
+    let res = res.json::<HashMap<String, String>>();
 
     let res = match res {
         Ok(hash) => hash,
@@ -121,16 +125,18 @@ fn display_channel_menu(
 
         for channel in &channels {
             if channel.id.to_string() == answer.to_string() {
-                display_channel(
+                display_channel(channel.name.clone(), channel.description.clone());
+                let res = message::chat(
                     channel.id.to_string(),
-                    channel.name.clone(),
-                    channel.description.clone(),
                     api_host.clone(),
                     api_port.clone(),
                     priv_key.clone(),
-                    pub_key.clone(),
                     rng.clone(),
                 );
+
+                if res != 0 {
+                    answer = "0".to_string();
+                }
             }
         }
     }
@@ -138,50 +144,8 @@ fn display_channel_menu(
     return 0;
 }
 
-fn display_channel(
-    id: String,
-    name: String,
-    description: String,
-    api_host: String,
-    api_port: String,
-    priv_key: RsaPrivateKey,
-    pub_key: RsaPublicKey,
-    rng: OsRng,
-) -> u8 {
-    /*let mut post_data = HashMap::new();
-
-    post_data.insert("token", env::var("TOKEN").unwrap());
-    post_data.insert("action", String::from("get"));
-    post_data.insert("channel_id", id.clone());
-    post_data.insert("count", String::from("20"));
-    post_data.insert("min_message_id", String::from("0"));
-
-    //TODO add status if I can not hit URL
-    let client = reqwest::blocking::Client::new();
-    let res = client
-        .post("http://".to_owned() + &*api_host + ":" + &*api_port + "/api/message")
-        .json(&post_data)
-        .send()
-        .expect("Connection failed!")
-        .json::<HashMap<String, String>>();
-
-    let res = match res {
-        Ok(hash) => hash,
-        Err(_) => {
-            log::get_logger().log("Connection failed!".to_string(), log::LogLevel::FATAL);
-            println!("Connection failed! Check your internet connection");
-            return 1;
-        }
-    };
-
-    let mut messages: Vec<message::Message> = Vec::new();
-    let mut last_message_id: u32 = 0;
-
-    match res.get("messages") {
-        Some(m) => messages = serde_json::from_str(m).unwrap(),
-        _ => (),
-    }*/
-
+// Get all the info about one channel and display it
+fn display_channel(name: String, description: String) -> u8 {
     let mut buff_enter = String::new();
 
     std::process::Command::new("clear").status().unwrap();
@@ -192,22 +156,15 @@ fn display_channel(
     println!("DESCRIPTION:\n{}", description);
     println!("========================");
     println!("Press enter to load previous messages.");
-    println!("!help to get available commands");
 
     io::stdin()
         .read_line(&mut buff_enter)
         .expect("Reading from stdin failed");
 
-    /*for message in &messages {
-        last_message_id = message.id;
-        println!("[{}] : {}", message.date, message.content);
-    }*/
-
-    message::chat(id, api_host, api_port, priv_key, pub_key, rng);
-
     return 0;
 }
 
+// Process for channel creation
 fn create_channel_menu(api_host: String, api_port: String) {
     let mut name = String::from("0");
     let mut description = String::from("0");
@@ -236,6 +193,7 @@ fn create_channel_menu(api_host: String, api_port: String) {
     create_channel(name, description, api_host, api_port);
 }
 
+// Send all the info from the user to create the channel (API side with BDD)
 fn create_channel(name: String, description: String, api_host: String, api_port: String) -> u8 {
     let mut post_data = HashMap::new();
 
@@ -244,14 +202,24 @@ fn create_channel(name: String, description: String, api_host: String, api_port:
     post_data.insert("name", name);
     post_data.insert("description", description);
 
-    //TODO add status if I can not hit URL
     let client = reqwest::blocking::Client::new();
     let res = client
         .post("http://".to_owned() + &*api_host + ":" + &*api_port + "/api/channel")
         .json(&post_data)
-        .send()
-        .expect("Connection failed!")
-        .json::<HashMap<String, String>>();
+        .send();
+
+    let res = match res {
+        Ok(result) => result,
+        Err(_) => {
+            log::get_logger().log(
+                "The RuslyChat server isn't reachable :(".to_string(),
+                log::LogLevel::ERROR,
+            );
+            return 2;
+        }
+    };
+
+    let res = res.json::<HashMap<String, String>>();
 
     let res = match res {
         Ok(hash) => hash,

@@ -4,9 +4,6 @@ use std::fs::OpenOptions;
 use std::io::Write;
 use chrono::{DateTime, Utc};
 
-// Static variables
-pub static _SIZE_LOG_FILE: u8 = 50;
-
 pub enum LogLevel {
     FATAL,
     ERROR,
@@ -55,17 +52,17 @@ impl Logger {
             let mut to_log;
 
             match flag {
-                LogLevel::FATAL => to_log = "\n[FATAL]".to_string(),
-                LogLevel::ERROR => to_log = "\n[ERROR]".to_string(),
-                LogLevel::INFO => to_log = "\n[INFO]".to_string(),
-                LogLevel::TRACE => to_log = "\n[TRACE]".to_string(),
-                LogLevel::DEBUG => to_log = "\n[DEBUG]".to_string(),
+                LogLevel::FATAL => to_log = "[FATAL]".to_string(),
+                LogLevel::ERROR => to_log = "[ERROR]".to_string(),
+                LogLevel::INFO => to_log = "[INFO]".to_string(),
+                LogLevel::TRACE => to_log = "[TRACE]".to_string(),
+                LogLevel::DEBUG => to_log = "[DEBUG]".to_string(),
             }
 
-            to_log += &*(get_log_time() + " : " + &*message);
+            to_log += &*(get_log_time() + " : " + &*message + "\n");
 
             //TODO to remove
-            println!("{}", to_log);
+            print!("{}", to_log);
 
             match file.write_all(to_log.as_bytes()) {
                 Err(e) => {

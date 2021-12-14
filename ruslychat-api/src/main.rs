@@ -39,6 +39,7 @@ struct Message {
     id: u32,
     content: Vec<u8>,
     date: String,
+    username: String,
 }
 
 #[tokio::main]
@@ -229,6 +230,8 @@ async fn main() {
                     Some(action) => {
                         match action.as_ref() {
                             "get" => {
+                                get_logger().log(format!("Action: Channel get"), LogLevel::TRACE);
+
                                 let mut channel_given_id = String::new();
                                 let mut channel_given_token = String::new();
 
@@ -292,10 +295,12 @@ async fn main() {
                                 return_data_json.insert("channels", channels_serialized);
                             },
                             "del" => {
+                                get_logger().log(format!("Action: Channel delete"), LogLevel::TRACE);
+
                                 let mut channel_given_id = String::new();
                                 let mut channel_given_token = String::new();
 
-                                match channel_data.get("id") {
+                                match channel_data.get("channel_id") {
                                     Some(value) => channel_given_id = value.to_string(),
                                     None => (),
                                 }
@@ -306,35 +311,60 @@ async fn main() {
                                     None => (),
                                 }
 
-                                let req_delete_user_channel: Statement;
+                                let req_user: Statement;
+                                let mut user_exists = 0;
 
                                 // SQL Request, remove users from channel
-                                req_delete_user_channel = conn.prep("DELETE FROM user_channel WHERE id_channel = :c_id")?;
+                                req_user = conn.prep("SELECT IF (COUNT(id) > 0, TRUE, FALSE) AS user_exists, id FROM user WHERE token = :u_token AND id != 0")?;
 
                                 // Response
-                                let _res_delete_user_channel: Vec<mysql::Row> = conn.exec(
-                                    &req_delete_user_channel,
+                                let res_user: Vec<mysql::Row> = conn.exec(
+                                    &req_user,
                                     params! {
-                                        "c_id" => channel_given_id.clone(),
+                                        "u_token" => channel_given_token.clone(),
                                     },
                                 )?;
 
-                                let req_delete_channel: Statement;
+                                for mut row in res_user {
+                                    // Getting user from db
+                                    user_exists = row.take("user_exists").unwrap();
+                                }
 
-                                // SQL Request, delete channel
-                                req_delete_channel = conn.prep("DELETE FROM channel WHERE id = :c_id")?;
+                                if user_exists == 1 {
+                                    let req_delete_user_channel: Statement;
 
-                                // Response
-                                let _res_delete_channel: Vec<mysql::Row> = conn.exec(
-                                    &req_delete_channel,
-                                    params! {
-                                        "c_id" => channel_given_id,
-                                    },
-                                )?;
+                                    // SQL Request, remove users from channel
+                                    req_delete_user_channel = conn.prep("DELETE FROM user_channel WHERE id_channel = :c_id")?;
 
-                                return_data_json.insert("channel", String::from("OK"));
+                                    // Response
+                                    let _res_delete_user_channel: Vec<mysql::Row> = conn.exec(
+                                        &req_delete_user_channel,
+                                        params! {
+                                            "c_id" => channel_given_id.clone(),
+                                        },
+                                    )?;
+
+                                    let req_delete_channel: Statement;
+
+                                    // SQL Request, delete channel
+                                    req_delete_channel = conn.prep("DELETE FROM channel WHERE id = :c_id")?;
+
+                                    // Response
+                                    let _res_delete_channel: Vec<mysql::Row> = conn.exec(
+                                        &req_delete_channel,
+                                        params! {
+                                            "c_id" => channel_given_id,
+                                        },
+                                    )?;
+
+                                    return_data_json.insert("channel", String::from("OK"));
+                                } else {
+                                    return_data_json.insert("channel", String::from("KO"));
+                                }
                             },
                             "set" => {
+                                get_logger().log(format!("Action: Channel add"), LogLevel::TRACE);
+
                                 let mut channel_given_token = String::new();
                                 let mut channel_given_name = String::new();
                                 let mut channel_given_description = String::new();
@@ -360,7 +390,7 @@ async fn main() {
                                 let mut res_select_user: Vec<mysql::Row> = Vec::new();
 
                                 // SQL Request, check if token OK
-                                req_select_user = conn.prep("SELECT IF (COUNT(id) > 0, TRUE, FALSE) AS user_exists, id FROM user WHERE token = :u_token")?;
+                                req_select_user = conn.prep("SELECT IF (COUNT(id) > 0, TRUE, FALSE) AS user_exists, id FROM user WHERE token = :u_token AND id != 0")?;
 
                                 // Response
                                 res_select_user = conn.exec(
@@ -371,15 +401,15 @@ async fn main() {
                                 )?;
 
                                 let mut user_exists = 0;
-                                let mut user_id = 0;
+                                //let mut user_id = 0;
 
                                 for mut row in res_select_user {
                                     // Getting user from db
                                     user_exists = row.take("user_exists").unwrap();
-                                    user_id = row.take("id").unwrap();
+                                    //user_id = row.take("id").unwrap();
                                 }
 
-                                if user_exists == 1 && user_id != 0 {
+                                if user_exists == 1 { // && user_id != 0
                                     let req_insert_channel: Statement;
                                     let mut res_insert_channel: Vec<mysql::Row> = Vec::new();
 
@@ -449,14 +479,7 @@ async fn main() {
             let (tx, rx) = mpsc::channel();
 
             // For message
-            /*let mut message_rng = rng2.clone();
-            let message_private_key = private_key2.clone();
-            let message_public_key = public_key2.clone();*/
-
             let mut message_rng = rng_message_route.clone();
-            //let message_private_key2 = private_key3.clone();
-            //let message_public_key2 = public_key3.clone();
-
             let message_private_key = private_key_message_route.clone();
 
             // Thread
@@ -473,6 +496,8 @@ async fn main() {
                     Some(action) => {
                         match action.as_ref() {
                             "get" => {
+                                get_logger().log(format!("Action: Message get"), LogLevel::TRACE);
+
                                 let mut message_given_token = String::new();
                                 let mut message_given_channel_id = String::new();
                                 let mut message_given_count = String::new();
@@ -505,13 +530,12 @@ async fn main() {
                                 let mut res_select_message: Vec<mysql::Row> = Vec::new();
 
                                 // SQL Request
-                                req_select_message = conn.prep("SELECT * FROM message m LEFT JOIN user u ON m.id_user = u.id WHERE u.token = :u_token AND m.id_channel = :c_id AND m.id > :m_id ORDER BY m.id DESC LIMIT :m_count")?;
+                                req_select_message = conn.prep("SELECT * FROM message m LEFT JOIN user u ON m.id_user = u.id WHERE m.id_channel = :c_id AND m.id > :m_id ORDER BY m.id DESC LIMIT :m_count")?;
 
                                 // Response
                                 res_select_message = conn.exec(
                                     &req_select_message,
                                     params! {
-                                        "u_token" => &message_given_token,
                                         "c_id" => message_given_channel_id,
                                         "m_count" => message_given_count,
                                         "m_id" => message_given_message_id
@@ -549,7 +573,8 @@ async fn main() {
                                     let message = Message {
                                         id: row.take("id").unwrap(),
                                         content: new_content,
-                                        date: row.take("date").unwrap()
+                                        date: row.take("date").unwrap(),
+                                        username: row.take("username").unwrap(),
                                     };
 
                                     messages.push(message);
@@ -563,6 +588,8 @@ async fn main() {
                                 return_data_json.insert("messages", messages_serialized);
                             },
                             "set" => {
+                                get_logger().log(format!("Action: Message add"), LogLevel::TRACE);
+
                                 let mut message_given_token = String::new();
                                 let mut message_given_channel_id = String::new();
                                 let mut message_given_content = String::new();

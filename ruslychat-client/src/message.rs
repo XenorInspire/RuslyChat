@@ -1,6 +1,5 @@
 use crate::init;
 use crate::log;
-use crate::message;
 use chrono::{DateTime, Utc};
 use ini::Ini;
 use rand::rngs::OsRng;
@@ -14,20 +13,22 @@ use std::thread;
 use std::time::Duration;
 
 #[derive(Deserialize, Debug)]
-pub struct Message {
-    pub id: u32,
-    pub content: Vec<u8>,
-    pub date: String,
+struct Message {
+    id: u32,
+    content: Vec<u8>,
+    date: String,
+    username: String,
 }
 
+// Main function of RuslyChat chat
 pub fn chat(
     channel_id: String,
     api_host: String,
     api_port: String,
     priv_key: RsaPrivateKey,
-    pub_key: RsaPublicKey,
     rng: OsRng,
-) {
+) -> u8 {
+    println!("!help to get available commands\n");
     let mut answer: String = String::from("0");
 
     let (tx, rx) = mpsc::channel();
@@ -36,6 +37,7 @@ pub fn chat(
     let api_port_cpy = api_port.clone();
     let priv_key_cpy = priv_key.clone();
 
+    // Get the last messages from the API
     let _thread = thread::spawn(move || {
         let mut last_message_id_to_send = 0;
         loop {
@@ -54,16 +56,13 @@ pub fn chat(
             thread::sleep(Duration::from_millis(5000));
 
             match rx.try_recv() {
-                Ok(_) | Err(TryRecvError::Disconnected) => {
-                    println!("Terminating.");
-                    break;
-                }
+                Ok(_) | Err(TryRecvError::Disconnected) => break,
                 Err(TryRecvError::Empty) => {}
             }
         }
     });
 
-    while answer.ne("!exit") {
+    while answer.ne("!exit") && answer.ne("!delete") {
         let mut buff_chat = String::new();
 
         io::stdin()
@@ -72,7 +71,12 @@ pub fn chat(
         answer = buff_chat.trim().to_string();
 
         if answer.chars().next().expect("0").to_string() == "!".to_string() {
-            check_command(answer.clone());
+            check_command(
+                api_host.clone(),
+                api_port.clone(),
+                channel_id.clone(),
+                answer.clone(),
+            );
         } else {
             send_message(
                 answer.clone(),
@@ -85,8 +89,15 @@ pub fn chat(
     }
 
     let _ = tx.send(());
+    
+    if answer.eq("!delete") {
+        return 1;
+    } else {
+        return 0;
+    }
 }
 
+// Encrypt and send the message to the API
 fn send_message(
     content: String,
     channel_id: String,
@@ -110,14 +121,25 @@ fn send_message(
     post_data.insert("content", encrypted_content);
     post_data.insert("date", time);
 
-    //TODO add status if I can not hit URL
     let client = reqwest::blocking::Client::new();
     let res = client
         .post("http://".to_owned() + &*api_host + ":" + &*api_port + "/api/message")
         .json(&post_data)
-        .send()
-        .expect("Connection failed!")
-        .json::<HashMap<String, String>>();
+        .send();
+
+    let res = match res {
+        Ok(result) => result,
+        Err(_) => {
+            log::get_logger().log(
+                "The RuslyChat server isn't reachable :(".to_string(),
+                log::LogLevel::ERROR,
+            );
+            println!("Connection failed! Check your internet connection");
+            return 2;
+        }
+    };
+
+    let res = res.json::<HashMap<String, String>>();
 
     let res = match res {
         Ok(hash) => hash,
@@ -149,6 +171,7 @@ fn send_message(
     return 0;
 }
 
+// Decrypt and get the message from the API
 fn receive_message(
     channel_id: String,
     min_message_id: u32,
@@ -164,14 +187,26 @@ fn receive_message(
     post_data.insert("min_message_id", min_message_id.to_string());
     post_data.insert("count", String::from("20"));
 
-    //TODO add status if I can not hit URL
     let client = reqwest::blocking::Client::new();
     let res = client
         .post("http://".to_owned() + &*api_host + ":" + &*api_port + "/api/message")
         .json(&post_data)
-        .send()
-        .expect("Connection failed!")
-        .json::<HashMap<String, String>>();
+        .send();
+
+    let res = match res {
+        Ok(result) => result,
+        Err(_) => {
+            log::get_logger().log(
+                "The RuslyChat server isn't reachable :(".to_string(),
+                log::LogLevel::ERROR,
+            );
+            println!("Connection failed! Check your internet connection");
+
+            return 0;
+        }
+    };
+
+    let res = res.json::<HashMap<String, String>>();
 
     let res = match res {
         Ok(hash) => hash,
@@ -185,7 +220,7 @@ fn receive_message(
         }
     };
 
-    let mut messages: Vec<message::Message> = Vec::new();
+    let mut messages: Vec<Message> = Vec::new();
     let mut last_message_id: u32 = 0;
 
     match res.get("messages") {
@@ -197,12 +232,16 @@ fn receive_message(
         let message_content = decrypt_message(message.content.clone(), priv_key.clone());
 
         last_message_id = message.id;
-        println!("[{}] : {}", message.date, message_content);
+        println!(
+            "[{}][{}] : {}",
+            message.date, message.username, message_content
+        );
     }
 
     last_message_id
 }
 
+// Encrypt a message with the public key
 fn encrypt_message(
     message: &str,
     mut rng: rand::rngs::OsRng,
@@ -219,6 +258,7 @@ fn encrypt_message(
     message_encrypted
 }
 
+// Decrypt a message with the private key
 fn decrypt_message(message: std::vec::Vec<u8>, priv_key: rsa::RsaPrivateKey) -> String {
     String::from_utf8(
         priv_key
@@ -228,17 +268,92 @@ fn decrypt_message(message: std::vec::Vec<u8>, priv_key: rsa::RsaPrivateKey) -> 
     .unwrap()
 }
 
-fn check_command(command: String) {
-    match command.as_str() {
-        "!help" => display_help(),
-        _ => unreachable!(),
+/*********                      COMMAND PART                        ***********/
+
+fn check_command(api_host: String, api_port: String, channel_id: String, command: String) {
+    let split = command.split(" ");
+
+    let args: Vec<&str> = split.collect();
+    let command_name = args[0];
+
+    match command_name {
+        "!help" => command_help(),
+        "!exit" => (),
+        "!add" => command_add(args),
+        "!delete" => command_delete(channel_id, api_host, api_port),
+        _ => println!("Invalid command!"),
     }
 }
 
-fn display_help() {
-    println!("List of commands :");
-    println!("!help => Display this help menu");
-    println!("!exit => Exit the channel");
-    println!("!add <user> => Add a user to this channel");
-    println!("!delete => Delete the conversation\nThis command will kick all the members.");
+// Display help menu with all the commands
+fn command_help() {
+    println!("[I]           List of commands            [I]");
+    println!("!help         => Display this help menu");
+    println!("!exit         => Exit the channel");
+    println!("!add <user>   => Add a user to this channel");
+    println!("!delete       => Delete the conversation");
+    println!("                      -\n");
+}
+
+// WIP
+fn command_add(args: Vec<&str>) {
+    println!("{:#?}", args);
+}
+
+// This function permits to delete the current channel
+fn command_delete(channel_id: String, api_host: String, api_port: String) {
+    let mut post_data = HashMap::new();
+
+    post_data.insert("token", env::var("TOKEN").unwrap());
+    post_data.insert("action", String::from("del"));
+    post_data.insert("channel_id", channel_id);
+
+    let client = reqwest::blocking::Client::new();
+    let res = client
+        .post("http://".to_owned() + &*api_host + ":" + &*api_port + "/api/channel")
+        .json(&post_data)
+        .send();
+
+    let res = match res {
+        Ok(result) => result,
+        Err(_) => {
+            log::get_logger().log(
+                "The RuslyChat server isn't reachable :(".to_string(),
+                log::LogLevel::ERROR,
+            );
+            return;
+        }
+    };
+
+    let res = res.json::<HashMap<String, String>>();
+
+    let res = match res {
+        Ok(hash) => hash,
+        Err(_) => {
+            log::get_logger().log(
+                "Connection failed! Can not delete the channel".to_string(),
+                log::LogLevel::FATAL,
+            );
+            println!("Connection failed! Check your internet connection");
+            return;
+        }
+    };
+
+    let mut channel_creation_status = String::new();
+
+    match res.get("channel") {
+        Some(c) => channel_creation_status = c.clone(),
+        _ => (),
+    }
+
+    if channel_creation_status.eq("OK") {
+        std::process::Command::new("clear").status().unwrap();
+        println!("Channel deleted!");
+    } else {
+        std::process::Command::new("clear").status().unwrap();
+        log::get_logger().log(
+            "Channel deletion error...".to_string(),
+            log::LogLevel::ERROR,
+        );
+    }
 }

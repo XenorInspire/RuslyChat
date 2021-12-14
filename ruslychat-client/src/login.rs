@@ -1,6 +1,5 @@
 extern crate ini;
 
-use crate::channel;
 use crate::init;
 use crate::log;
 
@@ -12,6 +11,7 @@ use std::collections::HashMap;
 use std::env;
 use std::io;
 
+// Get credentials of the API connection
 pub fn request_login(config: Config, pub_key: RsaPublicKey) -> u8 {
     let mut login = String::from("0");
     let mut password = String::from("0");
@@ -33,7 +33,8 @@ pub fn request_login(config: Config, pub_key: RsaPublicKey) -> u8 {
         password = read_password().unwrap();
     }
 
-    //TODO change api_port to config when available
+    std::process::Command::new("clear").status().unwrap();
+
     match api_login(
         config.domain.clone(),
         config.port_dest.clone().to_string(),
@@ -61,12 +62,12 @@ pub fn request_login(config: Config, pub_key: RsaPublicKey) -> u8 {
 
         0 => {
             return 0;
-            // channel::display_main_menu(config.domain.clone(), config.port_dest.clone().to_string())
         }
         _ => unreachable!(),
     };
 }
 
+// 
 fn api_login(
     api_host: String,
     api_port: String,
@@ -83,14 +84,24 @@ fn api_login(
         ToRsaPublicKey::to_pkcs1_pem(&public_key).unwrap(),
     );
 
-    //TODO add status if I can not hit URL
     let client = reqwest::blocking::Client::new();
     let res = client
         .post("http://".to_owned() + &*api_host + ":" + &*api_port + "/api/login")
         .json(&post_data)
-        .send()
-        .expect("Connection failed!")
-        .json::<HashMap<String, String>>();
+        .send();
+
+    let res = match res {
+        Ok(result) => result,
+        Err(_) => {
+            log::get_logger().log(
+                "The RuslyChat server isn't reachable :(".to_string(),
+                log::LogLevel::ERROR,
+            );
+            return 2;
+        }
+    };
+
+    let res = res.json::<HashMap<String, String>>();
 
     let res = match res {
         Ok(hash) => hash,
@@ -129,7 +140,6 @@ fn api_login(
             .set("public_key", api_public_key);
         conf.write_to_file(init::CONFIG_FILE).unwrap();
 
-        // println!("token: {:?}", token.clone());
         env::set_var("TOKEN", token);
         std::process::Command::new("clear").status().unwrap();
         return 0;

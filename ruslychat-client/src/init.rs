@@ -1,12 +1,12 @@
 extern crate ini;
 use ini::Ini;
 use regex::Regex;
+use std::env;
 use std::fs;
 use std::io;
 use std::path::Path;
 use std::process;
 use std::{thread, time};
-use std::env;
 
 // Global variables
 const NEW_CONFIG_FILE_MODE: u8 = 0;
@@ -204,6 +204,7 @@ pub fn change_config_values(mut temp_config: Config) -> Config {
         }
     }
 
+    std::process::Command::new("clear").status().unwrap();
     return temp_config;
 }
 

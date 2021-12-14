@@ -7,15 +7,10 @@ extern crate serde;
 extern crate serde_derive;
 extern crate serde_json;
 
+use rand::rngs::OsRng;
+use rsa::{RsaPrivateKey, RsaPublicKey};
 use std::env;
 use std::io;
-
-//temp
-use rand::rngs::OsRng;
-use rsa::{PaddingScheme, PublicKey, RsaPrivateKey, RsaPublicKey};
-use std::sync::mpsc::{self, TryRecvError};
-use std::thread;
-use std::time::Duration;
 
 mod channel;
 mod init;
@@ -35,31 +30,10 @@ fn main() {
     let pub_key = RsaPublicKey::from(&priv_key);
 
     log::get_logger().log("Ruslychat started!".to_string(), log::LogLevel::INFO);
-
-    /*
-    //temp
-    let (tx, rx) = mpsc::channel();
-    let _thread = thread::spawn(move || loop {
-        println!("Working...");
-        thread::sleep(Duration::from_millis(5000));
-
-        match rx.try_recv() {
-            Ok(_) | Err(TryRecvError::Disconnected) => {
-                println!("Terminating.");
-                break;
-            }
-            Err(TryRecvError::Empty) => {}
-        }
-    });
-    let mut line = String::new();
-    let stdin = io::stdin();
-    let _ = stdin.read_line(&mut line);
-    let _ = tx.send(());
-    //----
-    */
-
+    std::process::Command::new("clear").status().unwrap();
+    
+    // Display main menu
     while answer.eq("0") == false {
-        std::process::Command::new("clear").status().unwrap();
         println!("========================\n Welcome to RuslyChat !\n========================");
         println!("1 : Log in");
         println!("2 : Manage settings");
@@ -72,18 +46,19 @@ fn main() {
         answer = buff.trim().to_string();
 
         match &*answer {
+            // Log in process
             "1" => {
                 if login::request_login(config.clone(), pub_key.clone()) == 0 {
                     channel::display_main_menu(
                         config.domain.clone(),
                         config.port_dest.clone().to_string(),
                         priv_key.clone(),
-                        pub_key.clone(),
                         rng.clone(),
                     )
                 }
             }
 
+            // Settings management process
             "2" => {
                 config = init::change_config_values(config);
                 if config != backup {
