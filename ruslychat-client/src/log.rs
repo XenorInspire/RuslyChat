@@ -6,7 +6,7 @@ use std::io::Write;
 use std::path::Path;
 
 // Static variables
-pub static SIZE_LOG_FILE: u8 = 50;
+pub static _SIZE_LOG_FILE: u8 = 50;
 
 pub enum LogLevel {
     FATAL,

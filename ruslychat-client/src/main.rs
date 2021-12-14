@@ -1,4 +1,5 @@
 extern crate chrono;
+extern crate ini;
 extern crate rand;
 extern crate rpassword;
 extern crate rsa;
@@ -76,6 +77,9 @@ fn main() {
                     channel::display_main_menu(
                         config.domain.clone(),
                         config.port_dest.clone().to_string(),
+                        priv_key.clone(),
+                        pub_key.clone(),
+                        rng.clone(),
                     )
                 }
             }

@@ -1,8 +1,10 @@
+use crate::init;
 use crate::log;
 use crate::message;
 use chrono::{DateTime, Utc};
+use ini::Ini;
 use rand::rngs::OsRng;
-use rsa::{PaddingScheme, PublicKey, RsaPrivateKey, RsaPublicKey};
+use rsa::{pkcs1::FromRsaPublicKey, PaddingScheme, PublicKey, RsaPrivateKey, RsaPublicKey};
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::env;
@@ -14,24 +16,33 @@ use std::time::Duration;
 #[derive(Deserialize, Debug)]
 pub struct Message {
     pub id: u32,
-    pub content: String,
+    pub content: Vec<u8>,
     pub date: String,
 }
 
-pub fn chat(last_message_id: u32, channel_id: String, api_host: String, api_port: String) {
+pub fn chat(
+    channel_id: String,
+    api_host: String,
+    api_port: String,
+    priv_key: RsaPrivateKey,
+    pub_key: RsaPublicKey,
+    rng: OsRng,
+) {
+    let mut answer: String = String::from("0");
+
     let (tx, rx) = mpsc::channel();
     let channel_id_cpy = channel_id.clone();
     let api_host_cpy = api_host.clone();
     let api_port_cpy = api_port.clone();
+    let priv_key_cpy = priv_key.clone();
 
     let _thread = thread::spawn(move || {
-        //let channel_id_to_send = channel_id_cpy.clone();
-        let mut last_message_id_to_send = last_message_id.clone();
-        
+        let mut last_message_id_to_send = 0;
         loop {
             let res = receive_message(
                 channel_id_cpy.clone(),
                 last_message_id_to_send,
+                priv_key_cpy.clone(),
                 api_host_cpy.clone(),
                 api_port_cpy.clone(),
             );
@@ -52,17 +63,6 @@ pub fn chat(last_message_id: u32, channel_id: String, api_host: String, api_port
         }
     });
 
-    /*
-    let mut line = String::new();
-    let stdin = io::stdin();
-    let _ = stdin.read_line(&mut line);
-    */
-
-    let mut answer: String = String::from("0");
-    let mut rng = OsRng;
-    let priv_key = RsaPrivateKey::new(&mut rng, 2048).expect("failed to generate a key");
-    let pub_key = RsaPublicKey::from(&priv_key);
-
     while answer.ne("!exit") {
         let mut buff_chat = String::new();
 
@@ -78,7 +78,6 @@ pub fn chat(last_message_id: u32, channel_id: String, api_host: String, api_port
                 answer.clone(),
                 channel_id.clone(),
                 rng,
-                pub_key.clone(),
                 api_host.clone(),
                 api_port.clone(),
             );
@@ -92,7 +91,6 @@ fn send_message(
     content: String,
     channel_id: String,
     rng: OsRng,
-    pub_key: RsaPublicKey,
     api_host: String,
     api_port: String,
 ) -> u8 {
@@ -100,9 +98,12 @@ fn send_message(
     let now: DateTime<Utc> = Utc::now();
     let time = now.format("%Y-%m-%d %H:%M:%S").to_string();
 
-    let new_content = encrypt_message(&*content, rng, pub_key);
+    let conf = Ini::load_from_file(init::CONFIG_FILE).unwrap();
+    let network_section = conf.section(Some("NETWORK SETTINGS")).unwrap();
+    let public_key_string = network_section.get("public_key").unwrap();
+    let api_public_key = RsaPublicKey::from_pkcs1_pem(&public_key_string).unwrap();
+    let new_content = encrypt_message(&*content, rng, api_public_key);
     let encrypted_content = serde_json::to_string(&new_content).unwrap();
-    println!("{}", encrypted_content.clone());
     post_data.insert("token", env::var("TOKEN").unwrap());
     post_data.insert("action", String::from("set"));
     post_data.insert("id", channel_id);
@@ -151,6 +152,7 @@ fn send_message(
 fn receive_message(
     channel_id: String,
     min_message_id: u32,
+    priv_key: RsaPrivateKey,
     api_host: String,
     api_port: String,
 ) -> u32 {
@@ -192,8 +194,10 @@ fn receive_message(
     }
 
     for message in &messages {
+        let message_content = decrypt_message(message.content.clone(), priv_key.clone());
+
         last_message_id = message.id;
-        println!("[{}] : {}", message.date, message.content);
+        println!("[{}] : {}", message.date, message_content);
     }
 
     last_message_id
@@ -204,7 +208,7 @@ fn encrypt_message(
     mut rng: rand::rngs::OsRng,
     pub_key: rsa::RsaPublicKey,
 ) -> std::vec::Vec<u8> {
-    let mut message_encrypted = pub_key
+    let message_encrypted = pub_key
         .encrypt(
             &mut rng,
             PaddingScheme::new_pkcs1v15_encrypt(),
@@ -212,23 +216,6 @@ fn encrypt_message(
         )
         .expect("failed to encrypt");
 
-    log::get_logger().log(
-        format!("{:?}", message_encrypted.clone()),
-        log::LogLevel::DEBUG,
-    );
-
-    //message_encrypted.retain(|&x| x != 255);
-    //message_encrypted = vec![120, 12, 32, 18];
-    // let test = String::from_utf8_lossy(&message_encrypted);
-
-    // log::get_logger().log(format!("{:?}", test.clone()), log::LogLevel::DEBUG);
-
-    /*String::from_utf8(
-        ,
-    )
-    .expect("Found invalid UTF-8")*/
-
-    // "test".to_string()
     message_encrypted
 }
 

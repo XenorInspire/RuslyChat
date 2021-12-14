@@ -1,6 +1,8 @@
 use crate::log;
 use crate::message;
 use log::{get_logger, LogLevel};
+use rand::rngs::OsRng;
+use rsa::{PaddingScheme, PublicKey, RsaPrivateKey, RsaPublicKey};
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::env;
@@ -13,7 +15,13 @@ pub struct Channel {
     description: String,
 }
 
-pub fn display_main_menu(api_host: String, api_port: String) {
+pub fn display_main_menu(
+    api_host: String,
+    api_port: String,
+    priv_key: RsaPrivateKey,
+    pub_key: RsaPublicKey,
+    rng: OsRng,
+) {
     let mut answer = String::from("1");
 
     while answer.ne("0") {
@@ -30,7 +38,14 @@ pub fn display_main_menu(api_host: String, api_port: String) {
 
         match &*answer {
             "1" => {
-                if display_channel_menu(api_host.clone(), api_port.clone()) == 1 {
+                if display_channel_menu(
+                    api_host.clone(),
+                    api_port.clone(),
+                    priv_key.clone(),
+                    pub_key.clone(),
+                    rng.clone(),
+                ) == 1
+                {
                     println!("Connection failed! Can't get list of channels");
                 }
                 std::process::Command::new("clear").status().unwrap();
@@ -47,7 +62,13 @@ pub fn display_main_menu(api_host: String, api_port: String) {
     std::process::Command::new("clear").status().unwrap();
 }
 
-fn display_channel_menu(api_host: String, api_port: String) -> u8 {
+fn display_channel_menu(
+    api_host: String,
+    api_port: String,
+    priv_key: RsaPrivateKey,
+    pub_key: RsaPublicKey,
+    rng: OsRng,
+) -> u8 {
     let mut answer = String::from("1");
     let mut post_data = HashMap::new();
 
@@ -106,6 +127,9 @@ fn display_channel_menu(api_host: String, api_port: String) -> u8 {
                     channel.description.clone(),
                     api_host.clone(),
                     api_port.clone(),
+                    priv_key.clone(),
+                    pub_key.clone(),
+                    rng.clone(),
                 );
             }
         }
@@ -120,13 +144,16 @@ fn display_channel(
     description: String,
     api_host: String,
     api_port: String,
+    priv_key: RsaPrivateKey,
+    pub_key: RsaPublicKey,
+    rng: OsRng,
 ) -> u8 {
-    let mut post_data = HashMap::new();
+    /*let mut post_data = HashMap::new();
 
     post_data.insert("token", env::var("TOKEN").unwrap());
     post_data.insert("action", String::from("get"));
     post_data.insert("channel_id", id.clone());
-    post_data.insert("count", String::from("1"));
+    post_data.insert("count", String::from("20"));
     post_data.insert("min_message_id", String::from("0"));
 
     //TODO add status if I can not hit URL
@@ -153,7 +180,7 @@ fn display_channel(
     match res.get("messages") {
         Some(m) => messages = serde_json::from_str(m).unwrap(),
         _ => (),
-    }
+    }*/
 
     let mut buff_enter = String::new();
 
@@ -171,12 +198,12 @@ fn display_channel(
         .read_line(&mut buff_enter)
         .expect("Reading from stdin failed");
 
-    for message in &messages {
+    /*for message in &messages {
         last_message_id = message.id;
         println!("[{}] : {}", message.date, message.content);
-    }
+    }*/
 
-    message::chat(last_message_id, id, api_host, api_port);
+    message::chat(id, api_host, api_port, priv_key, pub_key, rng);
 
     return 0;
 }
