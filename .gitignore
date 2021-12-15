@@ -1,19 +1,15 @@
 .idea
 *.env
 ruslychat-client/target
-ruslychat-server/target
 ruslychat-api/target
 
 ruslychat-client/output/
-ruslychat-server/output/
 ruslychat-api/output/
 
 ruslychat-client/Cargo.lock
-ruslychat-server/Cargo.lock
 ruslychat-api/Cargo.lock
 
 ruslychat-client/logs/
-ruslychat-server/logs/
 ruslychat-api/logs/
 
-ruslychat-server/config/
+ruslychat-api/certificates/*
