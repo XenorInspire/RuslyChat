@@ -5,12 +5,16 @@ use crate::log;
 
 use ini::Ini;
 use init::Config;
+use regex::Regex;
 use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, CONTENT_TYPE};
 use rpassword::read_password;
 use rsa::{pkcs1::ToRsaPublicKey, RsaPublicKey};
 use std::collections::HashMap;
 use std::env;
 use std::io;
+
+// Marvelous regex <3
+const EMAIL_REGEX_SYNTAX: &str = r"[^@ \t\r\n]+@[^@ \t\r\n]+\.[^@ \t\r\n]+";
 
 // Get credentials of the API connection
 pub fn request_login(config: Config, pub_key: RsaPublicKey) -> u8 {
@@ -149,5 +153,130 @@ pub fn api_login(
     } else {
         std::process::Command::new("clear").status().unwrap();
         return 1;
+    }
+}
+
+// Get new credentials for the registration to the API
+pub fn user_registration(api_host: String, api_port: String) {
+    std::process::Command::new("clear").status().unwrap();
+    let mut buff_login = String::new();
+    let mut email = String::new();
+    let mut username = String::new();
+    let mut password1 = String::from("0");
+    let mut password2 = String::from("1");
+
+    println!("Enter a valid email :");
+    io::stdin()
+        .read_line(&mut buff_login)
+        .expect("Reading from stdin failed");
+    email = buff_login.trim().to_string();
+
+    buff_login = String::from("");
+
+    while check_email(email.clone()) == false {
+        println!("Email invalid! Try again.");
+        io::stdin()
+            .read_line(&mut buff_login)
+            .expect("Reading from stdin failed");
+        email = buff_login.trim().to_string();
+        buff_login = String::from("");
+    }
+
+    buff_login = String::from("");
+    println!("Enter a valid username :");
+    io::stdin()
+        .read_line(&mut buff_login)
+        .expect("Reading from stdin failed");
+    username = buff_login.trim().to_string();
+
+    while password1 != password2 {
+        println!("Enter a valid password :");
+        password1 = read_password().unwrap();
+
+        println!("Confirm your password :");
+        password2 = read_password().unwrap();
+    }
+
+    std::process::Command::new("clear").status().unwrap();
+
+    if send_user(
+        username.clone(),
+        email.clone(),
+        password1.clone(),
+        api_host.clone(),
+        api_port.clone(),
+    ) == true
+    {
+        println!("You are now registered!");
+    } else {
+        println!("Your registration failed. Try with another mail address or another username");
+    }
+
+    return;
+}
+
+// Check if a mail address is invalid or not
+fn check_email(email: String) -> bool {
+    return Regex::new(EMAIL_REGEX_SYNTAX).unwrap().is_match(&*email);
+}
+
+// Send user to the API and check the result
+fn send_user(
+    username: String,
+    email: String,
+    password: String,
+    api_host: String,
+    api_port: String,
+) -> bool {
+    let mut post_data = HashMap::new();
+    post_data.insert("username", username);
+    post_data.insert("email", email);
+    post_data.insert("password", password);
+    post_data.insert("action", String::from("set"));
+
+    let client = reqwest::blocking::ClientBuilder::new()
+        .danger_accept_invalid_certs(true)
+        .build()
+        .unwrap();
+
+    let res = client
+        .post("https://".to_owned() + &*api_host + ":" + &*api_port + "/api/register")
+        .json(&post_data)
+        .send();
+
+    let res = match res {
+        Ok(result) => result,
+        Err(e) => {
+            println!("The RuslyChat server isn't reachable :(");
+            log::get_logger().log(e.to_string(), log::LogLevel::ERROR);
+            return false;
+        }
+    };
+
+    let res = res.json::<HashMap<String, String>>();
+
+    let res = match res {
+        Ok(hash) => hash,
+        Err(_) => {
+            log::get_logger().log(
+                "Connection failed! Can not register to the server".to_string(),
+                log::LogLevel::FATAL,
+            );
+            println!("Connection failed! Check your internet connection");
+            return false;
+        }
+    };
+
+    let mut user_status = String::new();
+
+    match res.get("registration") {
+        Some(c) => user_status = c.clone(),
+        _ => (),
+    }
+
+    if user_status.eq("OK") {
+        return true;
+    } else {
+        return false;
     }
 }

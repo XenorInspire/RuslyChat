@@ -1,5 +1,6 @@
 use crate::init;
 use crate::log;
+use crate::user;
 use chrono::{DateTime, Utc};
 use ini::Ini;
 use rand::rngs::OsRng;
@@ -11,6 +12,7 @@ use std::io;
 use std::sync::mpsc::{self, TryRecvError};
 use std::thread;
 use std::time::Duration;
+use user::User;
 
 #[derive(Deserialize, Debug)]
 struct Message {
@@ -299,7 +301,8 @@ fn check_command(api_host: String, api_port: String, channel_id: String, command
     match command_name {
         "!help" => command_help(),
         "!exit" => (),
-        "!add" => command_add(args),
+        "!add" => command_add(args, channel_id, api_host, api_port),
+        "!list" => command_list(channel_id, api_host, api_port),
         "!delete" => command_delete(channel_id, api_host, api_port),
         _ => println!("Invalid command!"),
     }
@@ -311,13 +314,131 @@ fn command_help() {
     println!("!help         => Display this help menu");
     println!("!exit         => Exit the channel");
     println!("!add <user>   => Add a user to this channel");
+    println!("!list         => List all users in this channel");
     println!("!delete       => Delete the conversation");
     println!("                      -\n");
 }
 
-// WIP
-fn command_add(args: Vec<&str>) {
-    println!("{:#?}", args);
+// This function permits to add a user to the current channel
+fn command_add(args: Vec<&str>, channel_id: String, api_host: String, api_port: String) {
+    if args.len() < 2 {
+        println!("Usage: !add <user>");
+    } else {
+        let mut post_data = HashMap::new();
+
+        post_data.insert("token", env::var("TOKEN").unwrap());
+        post_data.insert("action", String::from("add_user"));
+        post_data.insert("login", String::from(args[1]));
+        post_data.insert("channel_id", channel_id);
+
+        let client = reqwest::blocking::ClientBuilder::new()
+            .danger_accept_invalid_certs(true)
+            .build()
+            .unwrap();
+
+        let res = client
+            .post("https://".to_owned() + &*api_host + ":" + &*api_port + "/api/channel")
+            .json(&post_data)
+            .send();
+
+        let res = match res {
+            Ok(result) => result,
+            Err(e) => {
+                println!("The RuslyChat server isn't reachable :(");
+                log::get_logger().log(e.to_string(), log::LogLevel::ERROR);
+                return;
+            }
+        };
+
+        let res = res.json::<HashMap<String, String>>();
+
+        let res = match res {
+            Ok(hash) => hash,
+            Err(_) => {
+                log::get_logger().log(
+                    "Connection failed! Can not delete the channel".to_string(),
+                    log::LogLevel::FATAL,
+                );
+                println!("Connection failed! Check your internet connection");
+                return;
+            }
+        };
+
+        let mut user_add_status = String::new();
+
+        match res.get("channel") {
+            Some(c) => user_add_status = c.clone(),
+            _ => (),
+        }
+
+        if user_add_status.eq("OK") {
+            println!("User added!");
+        } else {
+            println!("{}", user_add_status);
+            log::get_logger().log(
+                "Error on adding user to channel...".to_string(),
+                log::LogLevel::ERROR,
+            );
+        }
+    }
+}
+
+// This function permits to add a user to the current channel
+fn command_list(channel_id: String, api_host: String, api_port: String) {
+    let mut post_data = HashMap::new();
+
+    post_data.insert("token", env::var("TOKEN").unwrap());
+    post_data.insert("action", String::from("get_users"));
+    post_data.insert("channel_id", channel_id);
+
+    let client = reqwest::blocking::ClientBuilder::new()
+        .danger_accept_invalid_certs(true)
+        .build()
+        .unwrap();
+
+    let res = client
+        .post("https://".to_owned() + &*api_host + ":" + &*api_port + "/api/channel")
+        .json(&post_data)
+        .send();
+
+    let res = match res {
+        Ok(result) => result,
+        Err(e) => {
+            println!("The RuslyChat server isn't reachable :(");
+            log::get_logger().log(e.to_string(), log::LogLevel::ERROR);
+            return;
+        }
+    };
+
+    let res = res.json::<HashMap<String, String>>();
+
+    let res = match res {
+        Ok(hash) => hash,
+        Err(_) => {
+            log::get_logger().log(
+                "Connection failed! Can not delete the channel".to_string(),
+                log::LogLevel::FATAL,
+            );
+            println!("Connection failed! Check your internet connection");
+            return;
+        }
+    };
+
+    let mut users: Vec<User> = Vec::new();
+
+    match res.get("users") {
+        Some(u) => users = serde_json::from_str(u).unwrap(),
+        _ => (),
+    }
+
+    println!("--------------------------------------");
+    for user in &users {
+        println!(
+            "{} : {}",
+            user.username, user.email
+        );
+    }
+    println!("--------------------------------------");
 }
 
 // This function permits to delete the current channel

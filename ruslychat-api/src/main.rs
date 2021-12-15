@@ -42,6 +42,12 @@ struct Message {
     username: String,
 }
 
+#[derive(Serialize, Debug)]
+struct User {
+    email: String,
+    username: String,
+}
+
 #[tokio::main]
 async fn main() {
     let config = init::check_init_file();
@@ -60,7 +66,7 @@ async fn main() {
     get_logger().log("Ruslychat API started!".to_string(), LogLevel::INFO);
     
     // URI POST: /api/login
-    // with json data : { "login":"pseudo", "password":"password", "public_key":"client_public_key" }
+    // with json data : { "login":"username or email", "password":"password", "public_key":"client_public_key" }
     // For first login and generating the token
     let user_login = warp::path!("login")
         .and(warp::post())
@@ -403,15 +409,13 @@ async fn main() {
                                 )?;
 
                                 let mut user_exists = 0;
-                                //let mut user_id = 0;
 
                                 for mut row in res_select_user {
                                     // Getting user from db
                                     user_exists = row.take("user_exists").unwrap();
-                                    //user_id = row.take("id").unwrap();
                                 }
 
-                                if user_exists == 1 { // && user_id != 0
+                                if user_exists == 1 {
                                     let req_insert_channel: Statement;
                                     let mut res_insert_channel: Vec<mysql::Row> = Vec::new();
 
@@ -448,63 +452,170 @@ async fn main() {
                                 }
                             },
                             "add_user" => {
-                                // get_logger().log(format!("Action: Channel add user"), LogLevel::TRACE);
+                                get_logger().log(format!("Action: Channel add user"), LogLevel::TRACE);
 
-                                // let mut channel_given_token = String::new();
-                                // let mut channel_given_name = String::new();
-                                // let mut channel_given_description = String::new();
+                                let mut channel_given_token = String::new();
+                                let mut channel_given_login = String::new();
+                                let mut channel_given_channel_id = String::new();
 
-                                // match channel_data.get("token") {
-                                //     Some(value) => channel_given_token = value.to_string(),
-                                //     None => (),
-                                // }
+                                match channel_data.get("token") {
+                                    Some(value) => channel_given_token = value.to_string(),
+                                    None => (),
+                                }
 
-                                // match channel_data.get("name") {
-                                //     Some(value) => channel_given_name = value.to_string(),
-                                //     None => (),
-                                // }
-                                // get_logger().log(format!("Given name: {}", channel_given_name), LogLevel::DEBUG);
+                                match channel_data.get("login") {
+                                    Some(value) => channel_given_login = value.to_string(),
+                                    None => (),
+                                }
+                                get_logger().log(format!("Given user login: {}", channel_given_login), LogLevel::DEBUG);
 
-                                // match channel_data.get("description") {
-                                //     Some(value) => channel_given_description = value.to_string(),
-                                //     None => (),
-                                // }
-                                // get_logger().log(format!("Given description: {}", channel_given_description), LogLevel::DEBUG);
+                                match channel_data.get("channel_id") {
+                                    Some(value) => channel_given_channel_id = value.to_string(),
+                                    None => (),
+                                }
+                                get_logger().log(format!("Given channel id: {}", channel_given_channel_id), LogLevel::DEBUG);
 
-                                // let req_select_user: Statement;
-                                // let mut res_select_user: Vec<mysql::Row> = Vec::new();
+                                let req_select_post_user: Statement;
+                                let mut res_select_post_user: Vec<mysql::Row> = Vec::new();
 
-                                // let req_insert_channel: Statement;
-                                // let mut res_insert_channel: Vec<mysql::Row> = Vec::new();
+                                // SQL Request, check if token OK
+                                req_select_post_user = conn.prep("SELECT IF (COUNT(id) > 0, TRUE, FALSE) AS user_exists FROM user WHERE token = :u_token AND id != 0")?;
 
-                                // // SQL Request, insert channel
-                                // req_insert_channel = conn.prep("INSERT INTO channel (name, description) VALUES (:c_name, :c_description)")?;
+                                // Response
+                                res_select_post_user = conn.exec(
+                                    &req_select_post_user,
+                                    params! {
+                                        "u_token" => channel_given_token.clone(),
+                                    },
+                                )?;
 
-                                // // Response
-                                // res_insert_channel = conn.exec(
-                                //     &req_insert_channel,
-                                //     params! {
-                                //         "c_name" => channel_given_name,
-                                //         "c_description" => channel_given_description,
-                                //     },
-                                // )?;
+                                let mut user_exists = 0;
 
-                                // let req_insert_user_channel: Statement;
-                                // let mut res_insert_user_channel: Vec<mysql::Row> = Vec::new();
+                                for mut row in res_select_post_user.clone() {
+                                    // Getting user from db
+                                    user_exists = row.take("user_exists").unwrap();
+                                }
 
-                                // // SQL Request, insert user_channel
-                                // req_insert_user_channel = conn.prep("INSERT INTO user_channel (id_user, id_channel) VALUES ((SELECT id FROM user WHERE token = :u_token), :c_id)")?;
+                                if user_exists == 1 {
+                                    let req_select_user: Statement;
+                                    let mut res_select_user: Vec<mysql::Row> = Vec::new();
 
-                                // // Response
-                                // res_insert_user_channel = conn.exec(
-                                //     &req_insert_user_channel,
-                                //     params! {
-                                //         "u_token" => channel_given_token,
-                                //         "c_id" => conn.last_insert_id(),
-                                //     },
-                                // )?;
+                                    // SQL Request, check if token OK
+                                    req_select_user = conn.prep("SELECT id FROM user WHERE username = :u_login OR email = :u_login")?;
 
-                                // return_data_json.insert("channel", String::from("OK"));
+                                    // Response
+                                    res_select_user = conn.exec(
+                                        &req_select_user,
+                                        params! {
+                                            "u_login" => channel_given_login.clone(),
+                                        },
+                                    )?;
+
+                                    println!("{:#?}", res_select_user);
+
+                                    if !res_select_user.is_empty() {
+                                        let mut user_id = 0;
+
+                                        for mut row in res_select_user {
+                                            // Getting user from db
+                                            user_id = row.take("id").unwrap();
+                                        }
+
+                                        let req_insert_user_channel: Statement;
+                                        let mut res_insert_user_channel: Vec<mysql::Row> = Vec::new();
+
+                                        // SQL Request, insert channel
+                                        req_insert_user_channel = conn.prep("INSERT IGNORE INTO user_channel (id_user, id_channel) VALUES (:u_id, :c_id)")?;
+
+                                        // Response
+                                        res_insert_user_channel = conn.exec(
+                                            &req_insert_user_channel,
+                                            params! {
+                                                "u_id" => user_id,
+                                                "c_id" => channel_given_channel_id,
+                                            },
+                                        )?;
+
+                                        return_data_json.insert("channel", String::from("OK"));
+                                    } else {
+                                        return_data_json.insert("channel", String::from("User to add does not exist!"));
+                                    }
+                                } else {
+                                    return_data_json.insert("channel", String::from("Not a legitimate request..."));
+                                }
+                            },
+                            "get_users" => {
+                                get_logger().log(format!("Action: Channel get users"), LogLevel::TRACE);
+
+                                let mut channel_given_token = String::new();
+                                let mut channel_given_channel_id = String::new();
+
+                                match channel_data.get("token") {
+                                    Some(value) => channel_given_token = value.to_string(),
+                                    None => (),
+                                }
+
+                                match channel_data.get("channel_id") {
+                                    Some(value) => channel_given_channel_id = value.to_string(),
+                                    None => (),
+                                }
+                                get_logger().log(format!("Given channel id: {}", channel_given_channel_id), LogLevel::DEBUG);
+
+                                let req_select_post_user: Statement;
+                                let mut res_select_post_user: Vec<mysql::Row> = Vec::new();
+
+                                // SQL Request, check if token OK
+                                req_select_post_user = conn.prep("SELECT IF (COUNT(id) > 0, TRUE, FALSE) AS user_exists FROM user WHERE token = :u_token AND id != 0")?;
+
+                                // Response
+                                res_select_post_user = conn.exec(
+                                    &req_select_post_user,
+                                    params! {
+                                        "u_token" => channel_given_token.clone(),
+                                    },
+                                )?;
+
+                                let mut user_exists = 0;
+
+                                for mut row in res_select_post_user {
+                                    // Getting user from db
+                                    user_exists = row.take("user_exists").unwrap();
+                                }
+
+                                if user_exists == 1 {
+                                    let req_select_user_channel: Statement;
+                                    let mut res_select_user_channel: Vec<mysql::Row> = Vec::new();
+
+                                    // SQL Request, insert channel
+                                    req_select_user_channel = conn.prep("SELECT u.email, u.username FROM user_channel uc LEFT JOIN user u ON uc.id_user = u.id LEFT JOIN channel c ON uc.id_channel = c.id WHERE uc.id_channel = :c_id")?;
+
+                                    // Response
+                                    res_select_user_channel = conn.exec(
+                                        &req_select_user_channel,
+                                        params! {
+                                            "c_id" => channel_given_channel_id,
+                                        },
+                                    )?;
+
+                                    let mut users: Vec<_> = Vec::new();
+
+                                    for mut row in res_select_user_channel {
+                                        // Getting messages from db
+                                        let user = User {
+                                            email: row.take("email").unwrap(),
+                                            username: row.take("username").unwrap(),
+                                        };
+
+                                        users.push(user);
+                                    }
+
+                                    let users_serialized = serde_json::to_string(&users).unwrap();
+
+                                    return_data_json.insert("users", users_serialized);
+                                    return_data_json.insert("channel", String::from("OK"));
+                                } else {
+                                    return_data_json.insert("channel", String::from("Not a legitimate request..."));
+                                }
                             },
                             _ => get_logger().log("Channel action does not exist".to_string(), LogLevel::ERROR)
                         }
@@ -754,16 +865,126 @@ async fn main() {
         });
 
     // URI POST: /api/register
-    // with json data : { "pseudo":"user_pseudo", "email":"user_email", "password":"user_password" }
+    // with json data : { "action":"set", "username":"user_pseudo", "email":"user_email", "password":"user_password" }
     // For registering user
-    // let user_register = warp::path!("register")
-    //     .and(warp::post())
-    //     .and(warp::body::json())
-    //     .map( move |request_data: HashMap<String, String>| {
-    //     });
+    let user_register = warp::path!("register")
+        .and(warp::post())
+        .and(warp::body::json())
+        .map( move |request_data: HashMap<String, String>| {
+            let message_data = request_data.clone();
+            let mut return_data_json: HashMap<_, String> = HashMap::new();
+
+            // For sending result from thread
+            let (tx, rx) = mpsc::channel();
+
+            // Thread
+            let _thread = thread::spawn(move || -> Result<()> {
+                let config = init::check_init_file();
+
+                // Database connection
+                let url: String = "mysql://".to_owned() + &*config.user + ":" + &*config.passwd + "@localhost:3306/" + &*config.database;
+                let opts: Opts = Opts::from_url(&*url)?;
+                let pool: Pool = Pool::new(opts)?;
+                let mut conn: PooledConn = pool.get_conn()?;
+
+                match message_data.get("action") {
+                    Some(action) => {
+                        match action.as_ref() {
+                            "set" => {
+                                get_logger().log(format!("Action: Register user"), LogLevel::TRACE);
+
+                                let mut message_given_username = String::new();
+                                let mut message_given_email = String::new();
+                                let mut message_given_password = String::new();
+
+                                match message_data.get("username") {
+                                    Some(value) => message_given_username = value.to_string(),
+                                    None => (),
+                                }
+
+                                match message_data.get("email") {
+                                    Some(value) => message_given_email = value.to_string(),
+                                    None => (),
+                                }
+                                
+                                match message_data.get("password") {
+                                    Some(value) => message_given_password = value.to_string(),
+                                    None => (),
+                                }
+
+                                // Check email and pseudo
+                                
+                                // SQL Request
+                                let req_select_user = conn.prep(
+                                    "SELECT * FROM `user` WHERE `email` = :email OR `username` = :username ",
+                                )?;
+
+                                // Response
+                                let res_select_user: Vec<mysql::Row> = conn.exec(
+                                    &req_select_user,
+                                    params! {
+                                        "email" => message_given_email.clone(),
+                                        "username" => message_given_username.clone(),
+                                    },
+                                )?;
+
+                                // Parsing response
+                                let mut username_from_db = String::new();
+                                let mut email_from_db = String::new();
+
+                                for mut row in res_select_user {
+                                    username_from_db = row.take("username").unwrap();
+                                    email_from_db = row.take("email").unwrap();
+                                }
+
+                                if username_from_db == message_given_username || email_from_db == message_given_email {
+                                    return_data_json.insert("registration", String::from("KO"));
+                                    return_data_json.insert("description", String::from("Username or email already taken."));
+                                } else{
+                                    // Hashing password
+                                    let hash_setup = "$6$salt";
+                                    let hashed_password = sha512_crypt::hash_with(hash_setup, message_given_password).unwrap();
+                                    
+                                    let req_insert_user: Statement;
+
+                                    // SQL Request
+                                    req_insert_user = conn.prep("INSERT INTO user (username, email, password) VALUES (:username, :email, :password)")?;
+
+                                    
+
+                                    // Response
+                                    let res_insert_user: Vec<mysql::Row> = conn.exec(
+                                        &req_insert_user,
+                                        params! {
+                                            "username" => message_given_username,
+                                            "email" => message_given_email,
+                                            "password" => hashed_password
+                                        },
+                                    )?;
+
+                                    return_data_json.insert("registration", String::from("OK"));
+                                }
+                            },
+                            _ => get_logger().log("Register action does not exist".to_string(), LogLevel::ERROR)
+                        }
+                    },
+                    _ => get_logger().log("Register action does not exist".to_string(), LogLevel::ERROR)
+                }
+
+                tx.send(return_data_json).unwrap();
+
+                Ok(())
+            });        
+
+            // Getting result from tread
+            let received = rx.recv().unwrap();
+
+            // Sending final result
+            return warp::reply::json(&received);
+        });
 
     // Build routes
-    let routes = user_login.or(channel).or(message);
+    let routes = user_login.or(user_register).or(channel).or(message);
     let routes = warp::path("api").and(routes);
 
     // Bind ip address and port

@@ -19,6 +19,7 @@ mod init;
 mod log;
 mod login;
 mod message;
+mod user;
 
 fn main() {
     // hash_gen::hash_generator();
@@ -38,7 +39,8 @@ fn main() {
     while answer.eq("0") == false {
         println!("========================\n Welcome to RuslyChat !\n========================");
         println!("1 : Log in");
-        println!("2 : Manage settings");
+        println!("2 : Register to RuslyChat");
+        println!("3 : Manage settings");
         println!("0 : Exit");
 
         let mut buff = String::new();
@@ -59,9 +61,16 @@ fn main() {
                     )
                 }
             }
+            // Registration process
+            "2" => {
+                login::user_registration(
+                    config.domain.clone(),
+                    config.port_dest.clone().to_string(),
+                );
+            }
 
             // Settings management process
-            "2" => {
+            "3" => {
                 config = init::change_config_values(config);
                 if config != backup {
                     init::create_new_config_file(init::CURRENT_CONFIG_FILE_MODE, config.clone());
