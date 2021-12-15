@@ -5,6 +5,7 @@ use std::path::Path;
 use std::{env, fs};
 
 // This struct list all type of logs
+#[allow(dead_code)]
 pub enum LogLevel {
     FATAL,
     ERROR,

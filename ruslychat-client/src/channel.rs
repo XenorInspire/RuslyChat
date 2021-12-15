@@ -15,14 +15,25 @@ pub struct Channel {
     description: String,
 }
 
+// Implement the clone function to the struct channel
+impl Clone for Channel {
+    fn clone(&self) -> Self {
+        Channel {
+            id: self.id.clone(),
+            name: self.name.clone(),
+            description: self.description.clone(),
+        }
+    }
+}
+
 // Main menu of RuslyChat when you are connected
 pub fn display_main_menu(api_host: String, api_port: String, priv_key: RsaPrivateKey, rng: OsRng) {
     let mut answer = String::from("1");
 
     while answer.ne("0") {
         println!("========================\n       Main Menu       \n========================");
-        println!("1 : Open a channel");
-        println!("2 : Create a new channel");
+        println!("1 : Open a chat");
+        println!("2 : Create a new chat");
         println!("0 : Exit");
 
         let mut buff = String::new();
@@ -40,7 +51,7 @@ pub fn display_main_menu(api_host: String, api_port: String, priv_key: RsaPrivat
                     rng.clone(),
                 ) == 1
                 {
-                    println!("Connection failed! Can't get list of channels");
+                    println!("Connection failed! Can't get list of chats");
                 }
                 std::process::Command::new("clear").status().unwrap();
             }
@@ -96,7 +107,7 @@ fn display_channel_menu(
             Ok(hash) => hash,
             Err(_) => {
                 log::get_logger().log(
-                    "Connection failed! Can't get list of channels".to_string(),
+                    "Connection failed! Can't get list of chats".to_string(),
                     log::LogLevel::ERROR,
                 );
                 return 1;
@@ -104,6 +115,8 @@ fn display_channel_menu(
         };
 
         let mut channels: Vec<Channel> = Vec::new();
+        let mut channel_list: HashMap<String, Channel> = HashMap::new();
+        let mut i = 1;
 
         match res.get("channels") {
             Some(c) => channels = serde_json::from_str(c).unwrap(),
@@ -114,10 +127,12 @@ fn display_channel_menu(
 
         std::process::Command::new("clear").status().unwrap();
 
-        println!("========================\n     Channel List      \n========================");
+        println!("========================\n     Chat List      \n========================");
         println!("0 : Exit");
         for channel in &channels {
-            println!("{} : {}", channel.id, channel.name);
+            channel_list.insert(i.to_string(), channel.clone());
+            println!("{} : {}", i, channel.name);
+            i += 1;
         }
 
         io::stdin()
@@ -125,17 +140,26 @@ fn display_channel_menu(
             .expect("Reading from stdin failed");
         answer = buff.trim().to_string();
 
-        for channel in &channels {
-            if channel.id.to_string() == answer.to_string() {
-                display_channel(channel.name.clone(), channel.description.clone());
-                message::chat(
-                    channel.id.to_string(),
-                    api_host.clone(),
-                    api_port.clone(),
-                    priv_key.clone(),
-                    rng.clone(),
-                );
-            }
+        if channel_list.contains_key(&answer.to_string()) {
+            display_channel(
+                channel_list.get(&answer.to_string()).unwrap().name.clone(),
+                channel_list
+                    .get(&answer.to_string())
+                    .unwrap()
+                    .description
+                    .clone(),
+            );
+            message::chat(
+                channel_list
+                    .get(&answer.to_string())
+                    .unwrap()
+                    .id
+                    .to_string(),
+                api_host.clone(),
+                api_port.clone(),
+                priv_key.clone(),
+                rng.clone(),
+            );
         }
     }
 
@@ -170,8 +194,8 @@ fn create_channel_menu(api_host: String, api_port: String) {
     while name.eq("0") || description.eq("0") {
         std::process::Command::new("clear").status().unwrap();
 
-        println!("========================\n Channel Creation Menu \n========================");
-        println!("Channel name:");
+        println!("========================\n Chat Creation Menu \n========================");
+        println!("Chat name:");
 
         let mut buff_name = String::new();
         io::stdin()
@@ -179,7 +203,7 @@ fn create_channel_menu(api_host: String, api_port: String) {
             .expect("Reading from stdin failed");
         name = buff_name.trim().to_string();
 
-        println!("Channel description (can be empty):");
+        println!("Chat description (can be empty):");
         let mut buff_description = String::from("");
 
         io::stdin()
@@ -233,7 +257,7 @@ fn create_channel(name: String, description: String, api_host: String, api_port:
         Ok(hash) => hash,
         Err(_) => {
             log::get_logger().log(
-                "Connection failed! Can't create a new channel".to_string(),
+                "Connection failed! Can't create a new chat".to_string(),
                 log::LogLevel::FATAL,
             );
             println!("Connection failed! Check your internet connection");
@@ -250,10 +274,10 @@ fn create_channel(name: String, description: String, api_host: String, api_port:
 
     if channel_creation_status.eq("OK") {
         std::process::Command::new("clear").status().unwrap();
-        println!("Channel created!");
+        println!("Chat created!");
     } else {
         std::process::Command::new("clear").status().unwrap();
-        get_logger().log("Channel creation error...".to_string(), LogLevel::ERROR);
+        get_logger().log("Chat creation error...".to_string(), LogLevel::ERROR);
         return 1;
     }
 

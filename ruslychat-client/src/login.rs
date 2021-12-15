@@ -6,7 +6,6 @@ use crate::log;
 use ini::Ini;
 use init::Config;
 use regex::Regex;
-use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, CONTENT_TYPE};
 use rpassword::read_password;
 use rsa::{pkcs1::ToRsaPublicKey, RsaPublicKey};
 use std::collections::HashMap;
@@ -160,8 +159,8 @@ pub fn api_login(
 pub fn user_registration(api_host: String, api_port: String) {
     std::process::Command::new("clear").status().unwrap();
     let mut buff_login = String::new();
-    let mut email = String::new();
-    let mut username = String::new();
+    let mut email;
+    let username;
     let mut password1 = String::from("0");
     let mut password2 = String::from("1");
 

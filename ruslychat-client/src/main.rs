@@ -7,14 +7,12 @@ extern crate serde;
 extern crate serde_derive;
 extern crate serde_json;
 
-use pwhash::sha512_crypt;
 use rand::rngs::OsRng;
 use rsa::{RsaPrivateKey, RsaPublicKey};
 use std::env;
 use std::io;
 
 mod channel;
-mod hash_gen;
 mod init;
 mod log;
 mod login;
@@ -22,7 +20,6 @@ mod message;
 mod user;
 
 fn main() {
-    // hash_gen::hash_generator();
     let mut config = init::check_init_file();
     let mut backup = config.clone();
     let mut answer = String::from("1");
@@ -88,21 +85,15 @@ mod tests {
 
     #[test]
     fn test_rsa_encryption_decryption() {
-        // Conf 1
-        let mut rng1 = OsRng;
-        let private_key1 = RsaPrivateKey::new(&mut rng1, 1024).expect("failed to generate a key");
-
-        // Conf 2
-        let mut rng2 = OsRng;
-        let private_key2 = RsaPrivateKey::new(&mut rng2, 1024).expect("failed to generate a key");
-        let public_key2 = RsaPublicKey::from(&private_key2);
+        let mut rng = OsRng;
+        let private_key = RsaPrivateKey::new(&mut rng, 1024).expect("failed to generate a key");
+        let public_key = RsaPublicKey::from(&private_key);
 
         let data_to_encrypt = "Hello";
-        let data_encrypted = message::encrypt_message(data_to_encrypt, rng1, public_key2);
-        let data_decrypted = message::decrypt_message(data_encrypted, private_key2);
+        let data_encrypted = message::encrypt_message(data_to_encrypt, rng, public_key);
+        let data_decrypted = message::decrypt_message(data_encrypted, private_key);
 
         assert_eq!(data_to_encrypt.to_owned(), data_decrypted);
-        // assert_ne!(data_to_encrypt.to_owned(), data_encrypted);
     }
 
     #[test]

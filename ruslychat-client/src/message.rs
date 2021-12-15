@@ -55,7 +55,7 @@ pub fn chat(
                 last_message_id_to_send = res;
             }
 
-            thread::sleep(Duration::from_millis(5000));
+            thread::sleep(Duration::from_millis(2500));
 
             match rx.try_recv() {
                 Ok(_) | Err(TryRecvError::Disconnected) => break,
@@ -433,10 +433,7 @@ fn command_list(channel_id: String, api_host: String, api_port: String) {
 
     println!("--------------------------------------");
     for user in &users {
-        println!(
-            "{} : {}",
-            user.username, user.email
-        );
+        println!("{} : {}", user.username, user.email);
     }
     println!("--------------------------------------");
 }
