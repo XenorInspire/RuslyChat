@@ -7,6 +7,7 @@ use std::{thread, time};
 
 static CONFIG_FILE: &str = "config/config.ini";
 
+#[derive(PartialEq)]
 pub struct Config {
     pub port: u16,
     pub logs_directory: String,
@@ -15,6 +16,20 @@ pub struct Config {
     pub passwd: String,
 }
 
+// Implement the clone function to the struct Config
+impl Clone for Config {
+    fn clone(&self) -> Self {
+        Config {
+            port: self.port.clone(),
+            logs_directory: self.logs_directory.clone(),
+            database: self.database.clone(),
+            user: self.user.clone(),
+            passwd: self.passwd.clone(),
+        }
+    }
+}
+
+// This function checks if the config file exists
 pub fn check_init_file() -> Config {
     if Path::new(CONFIG_FILE).exists() == true {
         return parse_init_file();
@@ -31,6 +46,7 @@ pub fn check_init_file() -> Config {
     }
 }
 
+// This function is charged to parse the init file and extract config values
 fn parse_init_file() -> Config {
     let conf = Ini::load_from_file(CONFIG_FILE).unwrap();
     let network_section = conf.section(Some("NETWORK SETTINGS")).unwrap();
@@ -55,6 +71,7 @@ fn parse_init_file() -> Config {
     return config;
 }
 
+// This functions is charged to create / update the config file
 fn create_new_config_file() {
     if Path::new("config").exists() == false {
         let f = fs::create_dir_all("config");
@@ -76,7 +93,7 @@ fn create_new_config_file() {
         .set("directory", "logs");
     conf.with_section(Some("DATABASE SETTINGS"))
         .set("database", "rusly_db")
-        .set("user", "rusly")  
-        .set("passwd", "root");   
+        .set("user", "rusly")
+        .set("passwd", "root");
     conf.write_to_file(CONFIG_FILE).unwrap();
 }

@@ -64,50 +64,52 @@ fn display_channel_menu(
     rng: OsRng,
 ) -> u8 {
     let mut answer = String::from("1");
-    let mut post_data = HashMap::new();
-
-    post_data.insert("token", env::var("TOKEN").unwrap());
-    post_data.insert("action", String::from("get"));
-    post_data.insert("id", String::from("all"));
-
-    let client = reqwest::blocking::Client::new();
-    let res = client
-        .post("http://".to_owned() + &*api_host + ":" + &*api_port + "/api/channel")
-        .json(&post_data)
-        .send();
-
-    let res = match res {
-        Ok(result) => result,
-        Err(_) => {
-            log::get_logger().log(
-                "The RuslyChat server isn't reachable :(".to_string(),
-                log::LogLevel::ERROR,
-            );
-            return 1;
-        }
-    };
-
-    let res = res.json::<HashMap<String, String>>();
-
-    let res = match res {
-        Ok(hash) => hash,
-        Err(_) => {
-            log::get_logger().log(
-                "Connection failed! Can't get list of channels".to_string(),
-                log::LogLevel::ERROR,
-            );
-            return 1;
-        }
-    };
-
-    let mut channels: Vec<Channel> = Vec::new();
-
-    match res.get("channels") {
-        Some(c) => channels = serde_json::from_str(c).unwrap(),
-        _ => (),
-    }
-
     while answer.ne("0") {
+        let mut post_data = HashMap::new();
+
+        post_data.insert("token", env::var("TOKEN").unwrap());
+        post_data.insert("action", String::from("get"));
+        post_data.insert("id", String::from("all"));
+
+        let client = reqwest::blocking::ClientBuilder::new()
+            .danger_accept_invalid_certs(true)
+            .build()
+            .unwrap();
+
+        let res = client
+            .post("https://".to_owned() + &*api_host + ":" + &*api_port + "/api/channel")
+            .json(&post_data)
+            .send();
+
+        let res = match res {
+            Ok(result) => result,
+            Err(e) => {
+                println!("The RuslyChat server isn't reachable :(");
+                log::get_logger().log(e.to_string(), log::LogLevel::ERROR);
+                return 1;
+            }
+        };
+
+        let res = res.json::<HashMap<String, String>>();
+
+        let res = match res {
+            Ok(hash) => hash,
+            Err(_) => {
+                log::get_logger().log(
+                    "Connection failed! Can't get list of channels".to_string(),
+                    log::LogLevel::ERROR,
+                );
+                return 1;
+            }
+        };
+
+        let mut channels: Vec<Channel> = Vec::new();
+
+        match res.get("channels") {
+            Some(c) => channels = serde_json::from_str(c).unwrap(),
+            _ => (),
+        }
+
         let mut buff = String::new();
 
         std::process::Command::new("clear").status().unwrap();
@@ -126,17 +128,13 @@ fn display_channel_menu(
         for channel in &channels {
             if channel.id.to_string() == answer.to_string() {
                 display_channel(channel.name.clone(), channel.description.clone());
-                let res = message::chat(
+                message::chat(
                     channel.id.to_string(),
                     api_host.clone(),
                     api_port.clone(),
                     priv_key.clone(),
                     rng.clone(),
                 );
-
-                if res != 0 {
-                    answer = "0".to_string();
-                }
             }
         }
     }
@@ -182,12 +180,20 @@ fn create_channel_menu(api_host: String, api_port: String) {
         name = buff_name.trim().to_string();
 
         println!("Channel description (can be empty):");
+        let mut buff_description = String::from("");
 
-        let mut buff_description = String::new();
         io::stdin()
             .read_line(&mut buff_description)
             .expect("Reading from stdin failed");
         description = buff_description.trim().to_string();
+
+        while buff_description.len() > 255 {
+            println!("Description too long! (255 max)");
+            io::stdin()
+                .read_line(&mut buff_description)
+                .expect("Reading from stdin failed");
+            description = buff_description.trim().to_string();
+        }
     }
 
     create_channel(name, description, api_host, api_port);
@@ -202,19 +208,21 @@ fn create_channel(name: String, description: String, api_host: String, api_port:
     post_data.insert("name", name);
     post_data.insert("description", description);
 
-    let client = reqwest::blocking::Client::new();
+    let client = reqwest::blocking::ClientBuilder::new()
+        .danger_accept_invalid_certs(true)
+        .build()
+        .unwrap();
+
     let res = client
-        .post("http://".to_owned() + &*api_host + ":" + &*api_port + "/api/channel")
+        .post("https://".to_owned() + &*api_host + ":" + &*api_port + "/api/channel")
         .json(&post_data)
         .send();
 
     let res = match res {
         Ok(result) => result,
-        Err(_) => {
-            log::get_logger().log(
-                "The RuslyChat server isn't reachable :(".to_string(),
-                log::LogLevel::ERROR,
-            );
+        Err(e) => {
+            println!("The RuslyChat server isn't reachable :(");
+            log::get_logger().log(e.to_string(), log::LogLevel::ERROR);
             return 2;
         }
     };

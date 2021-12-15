@@ -19,6 +19,7 @@ pub struct Logger {
     pub log_file: String,
 }
 
+// Get a logger where you want
 pub fn get_logger() -> Logger {
     let path_logger;
     let log_file;
@@ -63,7 +64,6 @@ impl Logger {
 
             to_log += &*(get_log_time() + " : " + &*message + "\n");
 
-            //TODO to remove
             print!("{}", to_log);
 
             match file.write_all(to_log.as_bytes()) {
@@ -76,18 +76,20 @@ impl Logger {
     }
 }
 
+// Get current timestamp
 fn get_log_time() -> String {
     let now: DateTime<Utc> = Utc::now();
     now.format("[%d-%m-%Y %H:%M:%S]").to_string()
 }
 
+// Build the name of the log file
 fn get_log_file_name(path: String) -> String {
     let now: DateTime<Utc> = Utc::now();
     let time = now.format("%Y%m%d%H%M%S").to_string();
-
     path + "/ruslychat_" + &*time + ".log"
 }
 
+// Kind of obvious...
 fn check_log_directory(path: String) -> bool {
     if !Path::new(&path).exists() {
         match fs::create_dir_all(path) {

@@ -27,7 +27,7 @@ pub fn chat(
     api_port: String,
     priv_key: RsaPrivateKey,
     rng: OsRng,
-) -> u8 {
+) {
     println!("!help to get available commands\n");
     let mut answer: String = String::from("0");
 
@@ -70,31 +70,35 @@ pub fn chat(
             .expect("Reading from stdin failed");
         answer = buff_chat.trim().to_string();
 
-        if answer.chars().next().expect("0").to_string() == "!".to_string() {
-            check_command(
-                api_host.clone(),
-                api_port.clone(),
-                channel_id.clone(),
-                answer.clone(),
-            );
-        } else {
-            send_message(
-                answer.clone(),
-                channel_id.clone(),
-                rng,
-                api_host.clone(),
-                api_port.clone(),
-            );
+        if answer.len() > 0 {
+            if answer.len() <= 250 {
+                if answer.chars().next().expect("0").to_string() == "!".to_string() {
+                    check_command(
+                        api_host.clone(),
+                        api_port.clone(),
+                        channel_id.clone(),
+                        answer.clone(),
+                    );
+                } else {
+                    let res_send_message = send_message(
+                        answer.clone(),
+                        channel_id.clone(),
+                        rng,
+                        api_host.clone(),
+                        api_port.clone(),
+                    );
+
+                    if res_send_message == 2 {
+                        break;
+                    }
+                }
+            } else {
+                println!("Message too long (250 characters max)");
+            }
         }
     }
 
     let _ = tx.send(());
-    
-    if answer.eq("!delete") {
-        return 1;
-    } else {
-        return 0;
-    }
 }
 
 // Encrypt and send the message to the API
@@ -121,21 +125,23 @@ fn send_message(
     post_data.insert("content", encrypted_content);
     post_data.insert("date", time);
 
-    let client = reqwest::blocking::Client::new();
+    let client = reqwest::blocking::ClientBuilder::new()
+        .danger_accept_invalid_certs(true)
+        .build()
+        .unwrap();
+
     let res = client
-        .post("http://".to_owned() + &*api_host + ":" + &*api_port + "/api/message")
+        .post("https://".to_owned() + &*api_host + ":" + &*api_port + "/api/message")
         .json(&post_data)
         .send();
 
     let res = match res {
         Ok(result) => result,
-        Err(_) => {
-            log::get_logger().log(
-                "The RuslyChat server isn't reachable :(".to_string(),
-                log::LogLevel::ERROR,
-            );
+        Err(e) => {
+            println!("The RuslyChat server isn't reachable :(");
+            log::get_logger().log(e.to_string(), log::LogLevel::ERROR);
             println!("Connection failed! Check your internet connection");
-            return 2;
+            return 1;
         }
     };
 
@@ -149,7 +155,7 @@ fn send_message(
                 log::LogLevel::FATAL,
             );
             println!("Connection failed! Check your internet connection");
-            return 2;
+            return 1;
         }
     };
 
@@ -158,6 +164,18 @@ fn send_message(
     match res.get("message") {
         Some(m) => message_creation_status = m.clone(),
         _ => (),
+    }
+
+    let mut channel_status = String::new();
+
+    match res.get("channel") {
+        Some(c) => channel_status = c.clone(),
+        _ => (),
+    }
+
+    if channel_status.ne("OK") {
+        log::get_logger().log("Channel deleted!".to_string(), log::LogLevel::ERROR);
+        return 2;
     }
 
     if message_creation_status.ne("OK") {
@@ -187,19 +205,21 @@ fn receive_message(
     post_data.insert("min_message_id", min_message_id.to_string());
     post_data.insert("count", String::from("20"));
 
-    let client = reqwest::blocking::Client::new();
+    let client = reqwest::blocking::ClientBuilder::new()
+        .danger_accept_invalid_certs(true)
+        .build()
+        .unwrap();
+
     let res = client
-        .post("http://".to_owned() + &*api_host + ":" + &*api_port + "/api/message")
+        .post("https://".to_owned() + &*api_host + ":" + &*api_port + "/api/message")
         .json(&post_data)
         .send();
 
     let res = match res {
         Ok(result) => result,
-        Err(_) => {
-            log::get_logger().log(
-                "The RuslyChat server isn't reachable :(".to_string(),
-                log::LogLevel::ERROR,
-            );
+        Err(e) => {
+            println!("The RuslyChat server isn't reachable :(");
+            log::get_logger().log(e.to_string(), log::LogLevel::ERROR);
             println!("Connection failed! Check your internet connection");
 
             return 0;
@@ -242,7 +262,7 @@ fn receive_message(
 }
 
 // Encrypt a message with the public key
-fn encrypt_message(
+pub fn encrypt_message(
     message: &str,
     mut rng: rand::rngs::OsRng,
     pub_key: rsa::RsaPublicKey,
@@ -259,7 +279,7 @@ fn encrypt_message(
 }
 
 // Decrypt a message with the private key
-fn decrypt_message(message: std::vec::Vec<u8>, priv_key: rsa::RsaPrivateKey) -> String {
+pub fn decrypt_message(message: std::vec::Vec<u8>, priv_key: rsa::RsaPrivateKey) -> String {
     String::from_utf8(
         priv_key
             .decrypt(PaddingScheme::new_pkcs1v15_encrypt(), &message)
@@ -308,19 +328,21 @@ fn command_delete(channel_id: String, api_host: String, api_port: String) {
     post_data.insert("action", String::from("del"));
     post_data.insert("channel_id", channel_id);
 
-    let client = reqwest::blocking::Client::new();
+    let client = reqwest::blocking::ClientBuilder::new()
+        .danger_accept_invalid_certs(true)
+        .build()
+        .unwrap();
+
     let res = client
-        .post("http://".to_owned() + &*api_host + ":" + &*api_port + "/api/channel")
+        .post("https://".to_owned() + &*api_host + ":" + &*api_port + "/api/channel")
         .json(&post_data)
         .send();
 
     let res = match res {
         Ok(result) => result,
-        Err(_) => {
-            log::get_logger().log(
-                "The RuslyChat server isn't reachable :(".to_string(),
-                log::LogLevel::ERROR,
-            );
+        Err(e) => {
+            println!("The RuslyChat server isn't reachable :(");
+            log::get_logger().log(e.to_string(), log::LogLevel::ERROR);
             return;
         }
     };

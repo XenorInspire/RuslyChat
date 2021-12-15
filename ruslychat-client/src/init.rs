@@ -9,7 +9,7 @@ use std::process;
 use std::{thread, time};
 
 // Global variables
-const NEW_CONFIG_FILE_MODE: u8 = 0;
+pub const NEW_CONFIG_FILE_MODE: u8 = 0;
 pub const CURRENT_CONFIG_FILE_MODE: u8 = 1;
 
 // Default values
@@ -99,6 +99,7 @@ fn parse_init_file() -> Config {
     }
 }
 
+// Display error at startup if one or several settings are invalid
 fn error_at_startup(error_msg: &str) {
     println!("{}", error_msg);
     println!("Press n to generate new config file, otherwise, RuslyChat will shutdown :/");
@@ -116,7 +117,7 @@ fn error_at_startup(error_msg: &str) {
         };
         create_new_config_file(NEW_CONFIG_FILE_MODE, config);
     } else {
-        std::process::exit(1);
+        process::exit(1);
     }
 }
 

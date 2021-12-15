@@ -5,6 +5,7 @@ use crate::log;
 
 use ini::Ini;
 use init::Config;
+use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, CONTENT_TYPE};
 use rpassword::read_password;
 use rsa::{pkcs1::ToRsaPublicKey, RsaPublicKey};
 use std::collections::HashMap;
@@ -67,8 +68,8 @@ pub fn request_login(config: Config, pub_key: RsaPublicKey) -> u8 {
     };
 }
 
-// 
-fn api_login(
+// Authenticate the user to the API
+pub fn api_login(
     api_host: String,
     api_port: String,
     login: String,
@@ -84,19 +85,21 @@ fn api_login(
         ToRsaPublicKey::to_pkcs1_pem(&public_key).unwrap(),
     );
 
-    let client = reqwest::blocking::Client::new();
+    let client = reqwest::blocking::ClientBuilder::new()
+        .danger_accept_invalid_certs(true)
+        .build()
+        .unwrap();
+
     let res = client
-        .post("http://".to_owned() + &*api_host + ":" + &*api_port + "/api/login")
+        .post("https://".to_owned() + &*api_host + ":" + &*api_port + "/api/login")
         .json(&post_data)
         .send();
 
     let res = match res {
         Ok(result) => result,
-        Err(_) => {
-            log::get_logger().log(
-                "The RuslyChat server isn't reachable :(".to_string(),
-                log::LogLevel::ERROR,
-            );
+        Err(e) => {
+            println!("The RuslyChat server isn't reachable :(");
+            log::get_logger().log(e.to_string(), log::LogLevel::ERROR);
             return 2;
         }
     };

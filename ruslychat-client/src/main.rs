@@ -7,18 +7,21 @@ extern crate serde;
 extern crate serde_derive;
 extern crate serde_json;
 
+use pwhash::sha512_crypt;
 use rand::rngs::OsRng;
 use rsa::{RsaPrivateKey, RsaPublicKey};
 use std::env;
 use std::io;
 
 mod channel;
+mod hash_gen;
 mod init;
 mod log;
 mod login;
 mod message;
 
 fn main() {
+    // hash_gen::hash_generator();
     let mut config = init::check_init_file();
     let mut backup = config.clone();
     let mut answer = String::from("1");
@@ -31,7 +34,6 @@ fn main() {
 
     log::get_logger().log("Ruslychat started!".to_string(), log::LogLevel::INFO);
     std::process::Command::new("clear").status().unwrap();
-    
     // Display main menu
     while answer.eq("0") == false {
         println!("========================\n Welcome to RuslyChat !\n========================");
@@ -68,5 +70,59 @@ fn main() {
             }
             _ => (),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_rsa_encryption_decryption() {
+        // Conf 1
+        let mut rng1 = OsRng;
+        let private_key1 = RsaPrivateKey::new(&mut rng1, 1024).expect("failed to generate a key");
+
+        // Conf 2
+        let mut rng2 = OsRng;
+        let private_key2 = RsaPrivateKey::new(&mut rng2, 1024).expect("failed to generate a key");
+        let public_key2 = RsaPublicKey::from(&private_key2);
+
+        let data_to_encrypt = "Hello";
+        let data_encrypted = message::encrypt_message(data_to_encrypt, rng1, public_key2);
+        let data_decrypted = message::decrypt_message(data_encrypted, private_key2);
+
+        assert_eq!(data_to_encrypt.to_owned(), data_decrypted);
+        // assert_ne!(data_to_encrypt.to_owned(), data_encrypted);
+    }
+
+    #[test]
+    fn test_connection_api() {
+        let config = init::check_init_file();
+        let mut rng = OsRng;
+        let priv_key = RsaPrivateKey::new(&mut rng, 2048).expect("failed to generate a key");
+        let pub_key = RsaPublicKey::from(&priv_key);
+
+        assert_eq!(
+            login::api_login(
+                config.domain.clone(),
+                config.port_dest.clone().to_string(),
+                "test".to_string(),
+                "test".to_string(),
+                pub_key.clone(),
+            ),
+            0
+        );
+    }
+
+    #[test]
+    fn test_config_file() {
+        let config = init::check_init_file();
+        init::create_new_config_file(init::NEW_CONFIG_FILE_MODE, config);
+        let new_config = init::check_init_file();
+
+        assert_eq!(new_config.domain.is_empty(), false);
+        assert_eq!(new_config.logs_directory.is_empty(), false);
+        assert_eq!(new_config.port_dest.to_string().is_empty(), false);
     }
 }

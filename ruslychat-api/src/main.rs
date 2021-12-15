@@ -50,7 +50,7 @@ async fn main() {
 
     // For login route
     let mut rng = OsRng;
-    let private_key = RsaPrivateKey::new(&mut rng, 4096).expect("failed to generate a key");
+    let private_key = RsaPrivateKey::new(&mut rng, 2048).expect("failed to generate a key");
     let public_key = RsaPublicKey::from(&private_key);
 
     // For message route
@@ -201,6 +201,8 @@ async fn main() {
             return warp::reply::json(&received);
         });
 
+    
+    
     // URI POST: /api/channel
     // with json data : { "token":"u_token", "action":"get", "id":"c_id|all" }
     // with json data : { "token":"u_token", "action":"del", "id":"c_id" }
@@ -445,6 +447,65 @@ async fn main() {
                                     return_data_json.insert("channel", String::from("KO"));
                                 }
                             },
+                            "add_user" => {
+                                // get_logger().log(format!("Action: Channel add user"), LogLevel::TRACE);
+
+                                // let mut channel_given_token = String::new();
+                                // let mut channel_given_name = String::new();
+                                // let mut channel_given_description = String::new();
+
+                                // match channel_data.get("token") {
+                                //     Some(value) => channel_given_token = value.to_string(),
+                                //     None => (),
+                                // }
+
+                                // match channel_data.get("name") {
+                                //     Some(value) => channel_given_name = value.to_string(),
+                                //     None => (),
+                                // }
+                                // get_logger().log(format!("Given name: {}", channel_given_name), LogLevel::DEBUG);
+
+                                // match channel_data.get("description") {
+                                //     Some(value) => channel_given_description = value.to_string(),
+                                //     None => (),
+                                // }
+                                // get_logger().log(format!("Given description: {}", channel_given_description), LogLevel::DEBUG);
+
+                                // let req_select_user: Statement;
+                                // let mut res_select_user: Vec<mysql::Row> = Vec::new();
+
+                                // let req_insert_channel: Statement;
+                                // let mut res_insert_channel: Vec<mysql::Row> = Vec::new();
+
+                                // // SQL Request, insert channel
+                                // req_insert_channel = conn.prep("INSERT INTO channel (name, description) VALUES (:c_name, :c_description)")?;
+
+                                // // Response
+                                // res_insert_channel = conn.exec(
+                                //     &req_insert_channel,
+                                //     params! {
+                                //         "c_name" => channel_given_name,
+                                //         "c_description" => channel_given_description,
+                                //     },
+                                // )?;
+
+                                // let req_insert_user_channel: Statement;
+                                // let mut res_insert_user_channel: Vec<mysql::Row> = Vec::new();
+
+                                // // SQL Request, insert user_channel
+                                // req_insert_user_channel = conn.prep("INSERT INTO user_channel (id_user, id_channel) VALUES ((SELECT id FROM user WHERE token = :u_token), :c_id)")?;
+
+                                // // Response
+                                // res_insert_user_channel = conn.exec(
+                                //     &req_insert_user_channel,
+                                //     params! {
+                                //         "u_token" => channel_given_token,
+                                //         "c_id" => conn.last_insert_id(),
+                                //     },
+                                // )?;
+
+                                // return_data_json.insert("channel", String::from("OK"));
+                            },
                             _ => get_logger().log("Channel action does not exist".to_string(), LogLevel::ERROR)
                         }
 
@@ -462,8 +523,8 @@ async fn main() {
 
             // Sending final result
             return warp::reply::json(&received);
-        });
-
+        }); 
+    
     // URI POST: /api/message
     // with json data : { "token":"u_token", "action":"get", "channel_id":"c_id", "count":"m_count"; "min_message_id":"m_id" }
     // with json data : { "token":"u_token", "action":"set", "id":"c_id", "content":"m_content", "date":"m_date" }
@@ -617,28 +678,62 @@ async fn main() {
                                 }
                                 get_logger().log(format!("Given message date: {}", message_given_date), LogLevel::DEBUG);
                                 
-                                let req_select_message: Statement;
-                                let mut res_select_message: Vec<mysql::Row> = Vec::new();
-                                
-                                // Decrypting
-                                let message_encrypted: Vec<u8> = serde_json::from_str(&message_given_content).unwrap();
-                                let message_given_content_decrypted = encrypt::decrypt_message(message_encrypted, message_private_key);
+                                let req_select_channel: Statement;
+                                let mut res_select_channel: Vec<mysql::Row> = Vec::new();
+                                let mut channel_exists = 0;
 
                                 // SQL Request
-                                req_select_message = conn.prep("INSERT INTO message (content, date, id_user, id_channel) VALUES (:m_content, :m_date, (SELECT id FROM user WHERE token = :u_token), :c_id)")?;
+                                req_select_channel = conn.prep("SELECT IF (COUNT(id) > 0, TRUE, FALSE) AS channel_exists FROM channel WHERE id = :c_id")?;
 
                                 // Response
-                                res_select_message = conn.exec(
-                                    &req_select_message,
+                                res_select_channel = conn.exec(
+                                    &req_select_channel,
                                     params! {
-                                        "m_content" => message_given_content_decrypted,
-                                        "m_date" => message_given_date,
-                                        "u_token" => message_given_token,
-                                        "c_id" => message_given_channel_id,
+                                        "c_id" => message_given_channel_id.clone(),
                                     },
                                 )?;
 
-                                return_data_json.insert("message", String::from("OK"));
+                                for mut row in res_select_channel {
+                                    channel_exists = row.take("channel_exists").unwrap();
+                                }
+
+                                if channel_exists != 0 {
+
+                                    let req_select_message: Statement;
+                                    let mut res_select_message: Vec<mysql::Row> = Vec::new();
+                                    
+                                    // Decrypting
+                                    let message_encrypted: Vec<u8> = serde_json::from_str(&message_given_content).unwrap();
+                                    let message_given_content_decrypted = encrypt::decrypt_message(message_encrypted, message_private_key);
+
+                                    if message_given_content_decrypted.len() <= 250 {
+
+                                        // SQL Request
+                                        req_select_message = conn.prep("INSERT INTO message (content, date, id_user, id_channel) VALUES (:m_content, :m_date, (SELECT id FROM user WHERE token = :u_token), :c_id)")?;
+
+                                        // Response
+                                        res_select_message = conn.exec(
+                                            &req_select_message,
+                                            params! {
+                                                "m_content" => message_given_content_decrypted,
+                                                "m_date" => message_given_date,
+                                                "u_token" => message_given_token,
+                                                "c_id" => message_given_channel_id,
+                                            },
+                                        )?;
+
+                                        return_data_json.insert("message", String::from("OK"));
+                                        return_data_json.insert("channel", String::from("OK"));
+
+                                    } else {
+                                        
+                                        return_data_json.insert("message", String::from("KO"));
+
+                                    }
+                                } else {
+                                    return_data_json.insert("message", String::from("KO"));
+                                    return_data_json.insert("channel", String::from("KO"));
+                                }
                             },
                             _ => get_logger().log("Message action does not exist".to_string(), LogLevel::ERROR)
                         }
@@ -658,13 +753,56 @@ async fn main() {
             return warp::reply::json(&received);
         });
 
-    // GET user data WIP
-    let get_user = warp::path!("user" / u32).map(|id| format!("id {}", id));
+    // URI POST: /api/register
+    // with json data : { "pseudo":"user_pseudo", "email":"user_email", "password":"user_password" }
+    // For registering user
+    // let user_register = warp::path!("register")
+    //     .and(warp::post())
+    //     .and(warp::body::json())
+    //     .map( move |request_data: HashMap<String, String>| {
+    //     });
 
     // Build routes
-    let routes = user_login.or(get_user).or(channel).or(message);
+    let routes = user_login.or(channel).or(message);
     let routes = warp::path("api").and(routes);
 
     // Bind ip address and port
-    warp::serve(routes).run(([0, 0, 0, 0], 6969)).await;
+    warp::serve(routes.clone())
+        .tls()
+        .cert_path("certificates/ruslychat.afvr.pro.crt")
+        .key_path("certificates/ruslychat.afvr.pro.key")
+        .run(([0, 0, 0, 0], 6969))
+        .await;
+}
+
+#[cfg(test)]
+mod tests {
+   
+    use super::*;
+
+    #[test]
+    fn test_rsa_encryption_decryption() {
+
+        // Conf 1
+        let mut rng1 = OsRng;
+        let private_key1 = RsaPrivateKey::new(&mut rng1, 1024).expect("failed to generate a key");
+
+        // Conf 2
+        let mut rng2 = OsRng;
+        let private_key2 = RsaPrivateKey::new(&mut rng2, 1024).expect("failed to generate a key");
+        let public_key2 = RsaPublicKey::from(&private_key2);
+
+        let data_to_encrypt = "Hello";
+        let data_encrypted = encrypt::encrypt_message(data_to_encrypt, rng1, public_key2);
+        let data_decrypted = encrypt::decrypt_message(data_encrypted, private_key2);
+
+        assert_eq!(data_to_encrypt.to_owned(), data_decrypted);
+        // assert_ne!(data_to_encrypt.to_owned(), data_encrypted);
+    }
+
+    #[test]
+    fn test_log_directory(){
+        let config = init::check_init_file();
+        assert_eq!(log::check_log_directory(config.logs_directory),true);
+    }
 }
