@@ -487,10 +487,10 @@ fn command_delete(channel_id: String, api_host: String, api_port: String) {
     }
 
     if channel_creation_status.eq("OK") {
-        std::process::Command::new("clear").status().unwrap();
+        print!("\x1B[2J\x1B[1;1H");
         println!("Channel deleted!");
     } else {
-        std::process::Command::new("clear").status().unwrap();
+        print!("\x1B[2J\x1B[1;1H");
         log::get_logger().log(
             "Channel deletion error...".to_string(),
             log::LogLevel::ERROR,

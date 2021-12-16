@@ -23,7 +23,7 @@ pub fn request_login(config: Config, pub_key: RsaPublicKey) -> u8 {
     while login.eq("0") || password.eq("0") {
         let mut buff_login = String::new();
 
-        std::process::Command::new("clear").status().unwrap();
+        print!("\x1B[2J\x1B[1;1H");
 
         println!("Login:");
 
@@ -37,7 +37,7 @@ pub fn request_login(config: Config, pub_key: RsaPublicKey) -> u8 {
         password = read_password().unwrap();
     }
 
-    std::process::Command::new("clear").status().unwrap();
+    print!("\x1B[2J\x1B[1;1H");
 
     match api_login(
         config.domain.clone(),
@@ -147,17 +147,17 @@ pub fn api_login(
         conf.write_to_file(init::CONFIG_FILE).unwrap();
 
         env::set_var("TOKEN", token);
-        std::process::Command::new("clear").status().unwrap();
+        print!("\x1B[2J\x1B[1;1H");
         return 0;
     } else {
-        std::process::Command::new("clear").status().unwrap();
+        print!("\x1B[2J\x1B[1;1H");
         return 1;
     }
 }
 
 // Get new credentials for the registration to the API
 pub fn user_registration(api_host: String, api_port: String) {
-    std::process::Command::new("clear").status().unwrap();
+    print!("\x1B[2J\x1B[1;1H");
     let mut buff_login = String::new();
     let mut email;
     let username;
@@ -196,7 +196,7 @@ pub fn user_registration(api_host: String, api_port: String) {
         password2 = read_password().unwrap();
     }
 
-    std::process::Command::new("clear").status().unwrap();
+    print!("\x1B[2J\x1B[1;1H");
 
     if send_user(
         username.clone(),

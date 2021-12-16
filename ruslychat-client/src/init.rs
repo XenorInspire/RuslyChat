@@ -147,7 +147,7 @@ pub fn change_config_values(mut temp_config: Config) -> Config {
     let mut answer = String::from("1");
 
     while answer.eq("0") == false {
-        std::process::Command::new("clear").status().unwrap();
+        print!("\x1B[2J\x1B[1;1H");
 
         display_settings_menu(&temp_config);
 
@@ -187,13 +187,13 @@ pub fn change_config_values(mut temp_config: Config) -> Config {
         }
     }
 
-    std::process::Command::new("clear").status().unwrap();
+    print!("\x1B[2J\x1B[1;1H");
     return temp_config;
 }
 
 // Kind of obvious...
 fn display_settings_menu(config: &Config) {
-    std::process::Command::new("clear").status().unwrap();
+    print!("\x1B[2J\x1B[1;1H");
 
     println!("========================\n        Settings         \n========================");
     println!("Domain => {}", config.domain);
@@ -206,7 +206,7 @@ fn change_domain() -> String {
     let mut buff = String::new();
 
     while check_domain(buff.clone()) == false && buff != String::from("q") {
-        std::process::Command::new("clear").status().unwrap();
+        print!("\x1B[2J\x1B[1;1H");
 
         buff = String::from("");
         println!("Enter a valid domain (or IP address)");
@@ -225,7 +225,7 @@ fn change_destination_port() -> u16 {
     let mut buff = String::from("");
 
     while check_destinaton_port(buff.clone()) == false {
-        std::process::Command::new("clear").status().unwrap();
+        print!("\x1B[2J\x1B[1;1H");
 
         println!("Enter a valid destination port");
         println!("Press q to cancel");

@@ -31,7 +31,7 @@ fn main() {
     let pub_key = RsaPublicKey::from(&priv_key);
 
     log::get_logger().log("Ruslychat started!".to_string(), log::LogLevel::INFO);
-    std::process::Command::new("clear").status().unwrap();
+    print!("\x1B[2J\x1B[1;1H");
     // Display main menu
     while answer.eq("0") == false {
         println!("========================\n Welcome to RuslyChat !\n========================");

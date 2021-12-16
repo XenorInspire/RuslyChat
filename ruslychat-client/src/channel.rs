@@ -53,18 +53,18 @@ pub fn display_main_menu(api_host: String, api_port: String, priv_key: RsaPrivat
                 {
                     println!("Connection failed! Can't get list of chats");
                 }
-                std::process::Command::new("clear").status().unwrap();
+                print!("\x1B[2J\x1B[1;1H");
             }
             "2" => {
                 create_channel_menu(api_host.clone(), api_port.clone());
             }
             _ => {
-                std::process::Command::new("clear").status().unwrap();
+                print!("\x1B[2J\x1B[1;1H");
             }
         }
     }
 
-    std::process::Command::new("clear").status().unwrap();
+    print!("\x1B[2J\x1B[1;1H");
 }
 
 // Get the list of all the channels the user has access and display it
@@ -125,7 +125,7 @@ fn display_channel_menu(
 
         let mut buff = String::new();
 
-        std::process::Command::new("clear").status().unwrap();
+        print!("\x1B[2J\x1B[1;1H");
 
         println!("========================\n     Chat List      \n========================");
         println!("0 : Exit");
@@ -170,7 +170,7 @@ fn display_channel_menu(
 fn display_channel(name: String, description: String) -> u8 {
     let mut buff_enter = String::new();
 
-    std::process::Command::new("clear").status().unwrap();
+    print!("\x1B[2J\x1B[1;1H");
 
     println!("========================");
     println!("NAME:\n{}", name);
@@ -192,7 +192,7 @@ fn create_channel_menu(api_host: String, api_port: String) {
     let mut description = String::from("0");
 
     while name.eq("0") || description.eq("0") {
-        std::process::Command::new("clear").status().unwrap();
+        print!("\x1B[2J\x1B[1;1H");
 
         println!("========================\n Chat Creation Menu \n========================");
         println!("Chat name:");
@@ -273,10 +273,10 @@ fn create_channel(name: String, description: String, api_host: String, api_port:
     }
 
     if channel_creation_status.eq("OK") {
-        std::process::Command::new("clear").status().unwrap();
+        print!("\x1B[2J\x1B[1;1H");
         println!("Chat created!");
     } else {
-        std::process::Command::new("clear").status().unwrap();
+        print!("\x1B[2J\x1B[1;1H");
         get_logger().log("Chat creation error...".to_string(), LogLevel::ERROR);
         return 1;
     }
