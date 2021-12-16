@@ -511,8 +511,6 @@ async fn main() {
                                         },
                                     )?;
 
-                                    println!("{:#?}", res_select_user);
-
                                     if !res_select_user.is_empty() {
                                         let mut user_id = 0;
 
